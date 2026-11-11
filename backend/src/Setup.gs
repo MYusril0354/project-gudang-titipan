@@ -43,6 +43,10 @@ function systemSetup_(params) {
 
   var result = setupAll(spreadsheetId, params.adminPassword || 'admin123', params.adminUsername || 'admin');
 
+  if (isTrue_(params.seedSample)) {
+    result.sample = seedSampleData_();
+  }
+
   // Simpan kunci setup agar pemanggilan berikutnya bisa diverifikasi.
   if (!setupKey) {
     var newKey = Utilities.getUuid().replace(/-/g, '').slice(0, 24);
@@ -185,6 +189,88 @@ function seedCounters_() {
     { key: 'DO-TTR', value: 0 }
   ]);
   return { created: 2, existing: 0 };
+}
+
+/* =========================================================
+   DATA CONTOH — mengikuti data dummy prototipe
+   ========================================================= */
+
+/**
+ * Isi master data contoh (idempoten: hanya bila tabel masih kosong).
+ * Satu pelanggan = satu gudang titipan (PRD 6.6).
+ */
+function seedSampleData_() {
+  var result = { products: 0, customers: 0, locations: 0, racks: 0, skipped: false };
+
+  if (readTable_('products').length || readTable_('customers').length) {
+    result.skipped = true;
+    return result;
+  }
+
+  var now = nowStamp_();
+  function base() {
+    return { created_at: now, created_by: 'setup', updated_at: now, updated_by: 'setup' };
+  }
+
+  // Produk
+  var products = [
+    { code: 'PRD-001', name: 'Kertas A4 80gsm', unit: 'rim' },
+    { code: 'PRD-002', name: 'Tinta Printer HP 680', unit: 'pcs' },
+    { code: 'PRD-003', name: 'Map Plastik', unit: 'pak' },
+    { code: 'PRD-004', name: 'Kabel HDMI 2m', unit: 'pcs' },
+    { code: 'PRD-005', name: 'Lampu LED 12W', unit: 'pcs' }
+  ];
+  products.forEach(function (p) {
+    appendRow_('products', Object.assign({ id: newId_(), code: p.code, name: p.name, unit: p.unit }, base()));
+    result.products++;
+  });
+
+  // Pelanggan
+  var customers = [
+    { code: 'SJY', name: 'PT Sinar Jaya', address: 'Jl. Merdeka No. 12, Jakarta Pusat', phone: '021-5551234' },
+    { code: 'MAB', name: 'CV Mitra Abadi', address: 'Jl. Ahmad Yani No. 88, Bekasi', phone: '021-5552345' },
+    { code: 'KRU', name: 'PT Karya Utama', address: 'Jl. Gatot Subroto No. 5, Jakarta Selatan', phone: '021-5553456' },
+    { code: 'TKB', name: 'Toko Berkah', address: 'Jl. Pasar Baru No. 3, Tangerang', phone: '021-5554567' }
+  ];
+  var customerIds = {};
+  customers.forEach(function (c) {
+    var row = Object.assign({ id: newId_(), code: c.code, name: c.name, address: c.address, phone: c.phone }, base());
+    appendRow_('customers', row);
+    customerIds[c.code] = row.id;
+    result.customers++;
+  });
+
+  // Gudang: 1 MAIN + 1 CONSIGN per pelanggan
+  var mainId = newId_();
+  appendRow_('locations', Object.assign({ id: mainId, type: 'MAIN', name: 'Gudang Utama', customer_id: '' }, base()));
+  result.locations++;
+
+  var consignIds = {};
+  customers.forEach(function (c) {
+    var id = newId_();
+    appendRow_('locations', Object.assign({
+      id: id, type: 'CONSIGN', name: 'Gudang Titipan — ' + c.name, customer_id: customerIds[c.code]
+    }, base()));
+    consignIds[c.code] = id;
+    result.locations++;
+  });
+
+  // Rak
+  var racks = [
+    { code: 'A-01-01', name: 'Rak A1 Level 1', location_id: mainId },
+    { code: 'B-01-01', name: 'Rak B1', location_id: consignIds.SJY },
+    { code: 'B-01-02', name: 'Rak B2', location_id: consignIds.SJY },
+    { code: 'C-01-01', name: 'Rak C1', location_id: consignIds.MAB },
+    { code: 'D-01-01', name: 'Rak D1', location_id: consignIds.KRU },
+    { code: 'E-01-01', name: 'Rak E1', location_id: consignIds.TKB }
+  ];
+  racks.forEach(function (r) {
+    appendRow_('racks', Object.assign({ id: newId_(), code: r.code, name: r.name, location_id: r.location_id }, base()));
+    result.racks++;
+  });
+
+  auditRaw_('setup', 'setup.seedSample', 'master', '', result);
+  return result;
 }
 
 /* =========================================================

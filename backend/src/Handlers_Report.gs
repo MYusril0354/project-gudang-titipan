@@ -41,12 +41,7 @@ function reportReconciliation_(params, ctx) {
   return { totalIn: 0, totalOut: 0, stock: 0, hanging: 0, exceptions: [], recentMovements: [] };
 }
 
-function userList_(params, ctx) { return { items: [] }; }
-function userCreate_(params, ctx) { throw apiError_('INTERNAL', 'user.create belum diimplementasikan (Fase 1).'); }
-function userUpdate_(params, ctx) { throw apiError_('INTERNAL', 'user.update belum diimplementasikan (Fase 1).'); }
-function userResetPassword_(params, ctx) { throw apiError_('INTERNAL', 'user.resetPassword belum diimplementasikan (Fase 1).'); }
-
-function auditList_(params, ctx) { return { items: [], page: 1, pageSize: 50, total: 0 }; }
+// user.* dan audit.list ada di Handlers_User.gs (khusus ADMIN).
 
 /** Konstanta alasan (PRD 6.4) — satu sumber kebenaran bersama frontend. */
 var ALASAN_ = {

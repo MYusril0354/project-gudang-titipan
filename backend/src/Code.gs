@@ -30,6 +30,9 @@ var ROUTES = {
   'system.bootstrap': { fn: systemBootstrap_, roles: null, write: false },
   'dashboard.summary': { fn: dashboardSummary_, roles: null, write: false },
 
+  /* --- self-test (ADMIN) --- */
+  'system.selfTest': { fn: systemSelfTest_, roles: [ROLES.ADMIN], write: true },
+
   /* --- master data: baca semua, tulis ADMIN --- */
   'master.list': { fn: masterList_, roles: null, write: false },
   'master.create': { fn: masterCreate_, roles: [ROLES.ADMIN], write: true },
