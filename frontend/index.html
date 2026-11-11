@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gudang Titipan — Monitoring</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">GT</div>
+      <div><div class="brand-title">Gudang Titipan</div>
+        <div class="brand-sub">Consignment Monitor</div></div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">Hari ini<b id="todayLabel">—</b></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageSub">Ringkasan stok titipan dan pending fisik</p>
+      </div>
+      <div class="topbar-right">
+        <span class="pill" id="envPill">—</span>
+        <span class="pill" id="userPill" hidden>—</span>
+        <div class="avatar" id="userAvatar">—</div>
+        <button class="btn btn-sm" id="logoutBtn" type="button" hidden>Keluar</button>
+      </div>
+    </header>
+    <div id="view" class="view">
+      <div class="panel"><div class="panel-body" style="padding:24px">
+        <div class="skeleton" style="width:40%;margin-bottom:12px"></div>
+        <div class="skeleton" style="width:70%;margin-bottom:12px"></div>
+        <div class="skeleton" style="width:55%"></div>
+      </div></div>
+    </div>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

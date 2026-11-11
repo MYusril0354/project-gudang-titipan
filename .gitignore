@@ -1,0 +1,38 @@
+# ---- Secrets & environment ----
+# URL deployment GAS per lingkungan (DEV/PROD) — jangan commit nilai nyata
+.env
+.env.*
+!.env.example
+**/config.local.js
+**/secrets.json
+
+# Kredensial clasp / Apps Script
+.clasprc.json
+.clasp.json
+
+# ---- Dependencies ----
+node_modules/
+package-lock.json.bak
+
+# ---- Editor & OS ----
+.vscode/*
+!.vscode/settings.json.example
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Log & cache ----
+*.log
+npm-debug.log*
+.cache/
+.netlify/
+dist/
+build/
+
+# ---- Backup data (jangan pernah commit data produksi) ----
+backup/
+*.csv
+*.xlsx
+!docs/**/*.csv

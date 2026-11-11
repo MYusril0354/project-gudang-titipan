@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masuk — Gudang Titipan</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body class="login-page">
+
+<main class="login-card">
+  <div class="login-brand">
+    <div class="logo">GT</div>
+    <div>
+      <div class="brand-title">Gudang Titipan</div>
+      <div class="brand-sub">Consignment Monitor</div>
+    </div>
+  </div>
+
+  <form id="loginForm" class="login-form" autocomplete="on">
+    <div class="field">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" required autofocus autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password">
+    </div>
+    <div id="loginError" class="form-error" role="alert" hidden></div>
+    <button id="loginBtn" class="btn btn-primary" type="submit">Masuk</button>
+  </form>
+
+  <p class="login-note">
+    Lupa password? Hubungi Administrator untuk reset.
+  </p>
+</main>
+
+<script type="module">
+  import { auth, setToken } from './js/api.js';
+  import { CONFIG } from './js/config.js';
+
+  const form = document.getElementById('loginForm');
+  const btn = document.getElementById('loginBtn');
+  const errBox = document.getElementById('loginError');
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    errBox.hidden = true;
+    btn.disabled = true;
+    btn.textContent = 'Memproses…';
+    try {
+      const data = await auth.login(
+        document.getElementById('username').value.trim(),
+        document.getElementById('password').value
+      );
+      setToken(data.token);
+      location.href = 'index.html';
+    } catch (err) {
+      errBox.textContent = err.message || 'Login gagal.';
+      errBox.hidden = false;
+      btn.disabled = false;
+      btn.textContent = 'Masuk';
+    }
+  });
+</script>
+</body>
+</html>

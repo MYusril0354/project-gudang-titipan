@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gudang Titipan — Monitoring</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#f4f5f9;--panel:#fff;--ink:#1b2136;--muted:#6b7280;--line:#e5e7f0;
+  --brand:#4f46e5;--brand2:#6366f1;--brand-soft:#eef1ff;
+  --green:#0e7a55;--green-soft:#e6f6ef;
+  --amber:#96620a;--amber-soft:#fdf3d6;
+  --red:#b42318;--red-soft:#fee9e7;
+  --blue:#1d4ed8;--blue-soft:#e6edff;
+  --gray-soft:#eef0f5;
+  --radius:14px;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
+}
+html,body{height:100%}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:100vh}
+.sidebar{background:#141a2e;color:#c7cbe0;display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:12px;align-items:center;padding:4px 6px 22px}
+.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:grid;place-items:center;font-weight:800;color:#fff;font-size:13px;letter-spacing:.5px}
+.brand-title{color:#fff;font-weight:650;font-size:13.5px}
+.brand-sub{font-size:11px;color:#7f87a8;margin-top:1px}
+#nav{display:flex;flex-direction:column;gap:4px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13.5px;color:#a9b0cc;border:none;background:none;width:100%;text-align:left;font-family:inherit;transition:.15s}
+.nav-item:hover{background:#1c2440;color:#e7e9f5}
+.nav-item.active{background:#252f52;color:#fff;box-shadow:inset 3px 0 0 #6366f1}
+.nav-item svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.nav-badge{margin-left:auto;background:#ef4444;color:#fff;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px}
+.sidebar-foot{margin-top:auto;padding:14px 10px;border-top:1px solid #232b47;font-size:11.5px;color:#7f87a8}
+.sidebar-foot b{display:block;color:#dfe3f2;font-size:12.5px;margin-top:2px}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:18px 28px;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.topbar h1{font-size:19px;margin:0;font-weight:680;letter-spacing:-.2px}
+.topbar p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.pill{background:var(--brand-soft);color:var(--brand);font-size:11.5px;font-weight:650;padding:5px 11px;border-radius:999px}
+.avatar{width:34px;height:34px;border-radius:50%;background:#e2e5f5;color:#3b4270;display:grid;place-items:center;font-weight:700;font-size:12px}
+.view{padding:22px 28px 70px;display:flex;flex-direction:column;gap:18px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media(max-width:1180px){.cards{grid-template-columns:repeat(2,1fr)}}
+.stat{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat::after{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--accent,var(--brand))}
+.stat-label{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.stat-value{font-size:26px;font-weight:750;margin-top:8px;letter-spacing:-.6px;line-height:1.1}
+.stat-value small{font-size:13px;font-weight:600;color:var(--muted);margin-left:5px;letter-spacing:0}
+.stat-foot{margin-top:8px;font-size:12px;color:var(--muted)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.panel-title{font-weight:680;font-size:14px}
+.panel-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.panel-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.panel-body{padding:0}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8a90a6;font-weight:700;padding:10px 14px;border-bottom:1px solid var(--line);background:#fafbfe;white-space:nowrap}
+.tbl td{padding:11px 14px;border-bottom:1px solid #f0f1f7;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:#fbfcff}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.kode{display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:6px;background:#eef1ff;color:#4f46e5}
+.rak{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:#f0f7ff;color:#1d4ed8;border:1px solid #d5e3f7}
+.sjtag{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:#fef8e6;color:#8a5a00;border:1px solid #f0d99e}
+.batchtag{display:inline-flex;align-items:center;gap:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.print-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:#f3f4f8;color:#6b7280}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:680;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.b-gray{background:var(--gray-soft);color:#4b5563}
+.b-amber{background:var(--amber-soft);color:var(--amber)}
+.b-green{background:var(--green-soft);color:var(--green)}
+.b-blue{background:var(--blue-soft);color:var(--blue)}
+.b-red{background:var(--red-soft);color:var(--red)}
+.b-purple{background:var(--brand-soft);color:var(--brand)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 12px;border-radius:9px;font-size:12.5px;font-weight:650;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:#c9cde0;background:#fafbff}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background:#4338ca;border-color:#4338ca}
+.btn-ok{background:#0e9f6e;border-color:#0e9f6e;color:#fff}
+.btn-ok:hover{background:#0b8a5f;border-color:#0b8a5f}
+.btn-warn{background:#fff;border-color:#f0d59a;color:#92620a}
+.btn-warn:hover{background:#fffaef}
+.btn-danger{background:#fff;border-color:#f3c0bb;color:#b42318}
+.btn-danger:hover{background:#fff5f4}
+.btn-sm{padding:5px 10px;font-size:11.5px;border-radius:8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-group{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.input{padding:8px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);outline:none;min-width:220px}
+.input:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 18px;background:#fff;flex-wrap:wrap}
+.tab{padding:12px 16px;cursor:pointer;font-size:13px;font-weight:650;color:var(--muted);border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;transition:.15s}
+.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+.tab:hover{color:var(--ink)}
+.tab .count{background:var(--gray-soft);color:#4b5563;padding:1px 7px;border-radius:999px;font-size:11px;margin-left:6px;font-weight:700}
+.tab.active .count{background:var(--brand-soft);color:var(--brand)}
+.empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px}
+.empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:4px}
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:12px;font-size:12.5px;line-height:1.55;border:1px solid}
+.callout-amber{background:#fffaf0;border-color:#f3e0b0;color:#6d4c06}
+.callout-blue{background:#f5f8ff;border-color:#d5e0fb;color:#28406f}
+.callout b{font-weight:700}
+.sj-card{border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:var(--shadow);overflow:hidden}
+.sj-head{display:flex;justify-content:space-between;gap:16px;padding:14px 18px;background:#fafbff;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.sj-no{font-weight:700;font-size:14px;letter-spacing:-.2px}
+.sj-meta{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:14px;flex-wrap:wrap}
+.sj-meta span b{color:#3c4358;font-weight:650}
+.modal-backdrop{position:fixed;inset:0;background:rgba(16,21,38,.55);display:grid;place-items:center;padding:20px;z-index:100;animation:fade .15s}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:680px;box-shadow:0 24px 60px rgba(16,21,38,.3);animation:pop .18s ease-out;max-height:92vh;display:flex;flex-direction:column}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.modal-head h3{margin:0;font-size:16px;font-weight:700}
+.modal-head p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+.modal-body{padding:20px 22px;overflow:auto}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;background:#fbfcff;border-radius:0 0 16px 16px;flex-wrap:wrap}
+.x{background:none;border:none;font-size:20px;line-height:1;color:#9aa0b5;cursor:pointer;padding:2px 6px;border-radius:6px}
+.x:hover{background:#f0f1f7;color:#444}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:680;color:#4b5563;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--ink);outline:none;transition:.15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.field textarea{resize:vertical;min-height:64px}
+.hint{font-size:11.5px;color:var(--muted);margin-top:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.infobox{background:#f8f9fe;border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px 16px;font-size:13px}
+.infobox .k{display:block;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin-bottom:3px}
+.infobox b{font-weight:700}
+.addline-box{background:#f8f9fe;border:1px solid var(--line);border-radius:11px;padding:14px;margin-bottom:16px}
+.addline-title{font-size:11.5px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+.inline-input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:12.5px;background:#fff;color:var(--ink);outline:none;width:100%}
+.inline-input:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.ks-form{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:900px){.ks-form{grid-template-columns:1fr 1fr}}
+.ks-tbl tbody tr.batch-start td{border-top:2px solid #cbd5e1}
+.ks-tbl tbody tr.batch-start:first-child td{border-top:none}
+.ks-tbl tbody tr.batch-start:hover td{background:#eef1fb}
+.ks-tbl td.balance-final{background:#f7f9ff;font-weight:750}
+.ks-tbl .saldo-cell{font-variant-numeric:tabular-nums;font-weight:700}
+.ks-tbl .in-cell{color:#0e7a55;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.ks-tbl .out-cell{color:#b42318;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.ref-type{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.4px;padding:1px 6px;border-radius:4px;margin-top:3px}
+.ref-in{background:#e6f6ef;color:#0e7a55}
+.ref-out{background:#e6edff;color:#1d4ed8}
+#toastRoot{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:10px;z-index:200}
+.toast{background:#141a2e;color:#fff;padding:12px 16px;border-radius:11px;font-size:13px;box-shadow:0 10px 30px rgba(16,21,38,.32);animation:slide .22s;max-width:360px;line-height:1.45}
+.toast.ok{border-left:3px solid #10b981}
+.toast.warn{border-left:3px solid #f59e0b}
+.toast.err{border-left:3px solid #ef4444}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes slide{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">GT</div>
+      <div><div class="brand-title">Gudang Titipan</div>
+        <div class="brand-sub">Consignment Monitor</div></div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">Hari ini<b id="todayLabel">—</b></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageSub">Ringkasan stok titipan dan pending fisik</p>
+      </div>
+      <div class="topbar-right">
+        <span class="pill">Data dummy</span>
+        <div class="avatar">AD</div>
+      </div>
+    </header>
+    <div id="view" class="view"></div>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+/* =========================================================
+   0. KONFIGURASI PERUSAHAAN
+   ========================================================= */
+const company = {
+  name:    'PT DISTRIBUSI NUSANTARA',
+  address: 'Jl. Industri Raya No. 45, Jakarta Timur 13910',
+  phone:   '(021) 8765-4321',
+  email:   'admin@distribusi.co.id',
+  npwp:    '01.234.567.8-901.000',
+  logo:    'DN'
+};
+
+/* =========================================================
+   1. DATA DUMMY
+   ========================================================= */
+const TODAY = '2024-11-11';
+const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+const db = {
+  customers: [
+    { id:'C1', code:'SJY', name:'PT Sinar Jaya',  address:'Jl. Merdeka No. 12, Jakarta Pusat', phone:'021-5551234' },
+    { id:'C2', code:'MAB', name:'CV Mitra Abadi', address:'Jl. Ahmad Yani No. 88, Bekasi',     phone:'021-5552345' },
+    { id:'C3', code:'KRU', name:'PT Karya Utama', address:'Jl. Gatot Subroto No. 5, Jakarta Selatan', phone:'021-5553456' },
+    { id:'C4', code:'TKB', name:'Toko Berkah',    address:'Jl. Pasar Baru No. 3, Tangerang',   phone:'021-5554567' },
+  ],
+  products: [
+    { id:'P1', code:'PRD-001', name:'Kertas A4 80gsm',      unit:'rim' },
+    { id:'P2', code:'PRD-002', name:'Tinta Printer HP 680', unit:'pcs' },
+    { id:'P3', code:'PRD-003', name:'Map Plastik',          unit:'pak' },
+    { id:'P4', code:'PRD-004', name:'Kabel HDMI 2m',        unit:'pcs' },
+    { id:'P5', code:'PRD-005', name:'Lampu LED 12W',        unit:'pcs' },
+  ],
+  locations: [
+    { id:'L1', type:'MAIN',    name:'Gudang Utama',                    customer:null },
+    { id:'L2', type:'CONSIGN', name:'Gudang Titipan — PT Sinar Jaya',  customer:'C1' },
+    { id:'L3', type:'CONSIGN', name:'Gudang Titipan — CV Mitra Abadi', customer:'C2' },
+    { id:'L4', type:'CONSIGN', name:'Gudang Titipan — PT Karya Utama', customer:'C3' },
+    { id:'L5', type:'CONSIGN', name:'Gudang Titipan — Toko Berkah',    customer:'C4' },
+  ],
+  racks: [
+    { id:'R1-01', locationId:'L1', code:'A-01-01', name:'Rak A1 Level 1' },
+    { id:'R2-01', locationId:'L2', code:'B-01-01', name:'Rak B1' },
+    { id:'R2-02', locationId:'L2', code:'B-01-02', name:'Rak B2' },
+    { id:'R3-01', locationId:'L3', code:'C-01-01', name:'Rak C1' },
+    { id:'R4-01', locationId:'L4', code:'D-01-01', name:'Rak D1' },
+    { id:'R5-01', locationId:'L5', code:'E-01-01', name:'Rak E1' },
+  ],
+  sj: [
+    { no:'SJ/2024/0101', date:'2024-11-02', customer:'C1', po:'PO-7781', lines:[
+      { id:'0101-1', product:'P1', qtySj:100, qtyCancelled:0, decision:'DONE',
+        receipts:[{ qty:100, rackId:'R2-01', date:'2024-11-03', pic:'Andi', batchNumber:'BN-20241103-001' }] },
+      { id:'0101-2', product:'P2', qtySj:50, qtyCancelled:0, decision:'WAITING',
+        receipts:[], alasan:'BELUM_READY_PRODUKSI', eta:'2024-11-18', pic:'Andi' },
+    ]},
+    { no:'SJ/2024/0102', date:'2024-11-04', customer:'C2', po:'PO-7790', lines:[
+      { id:'0102-1', product:'P3', qtySj:200, qtyCancelled:0, decision:'WAITING',
+        receipts:[{ qty:120, rackId:'R3-01', date:'2024-11-05', pic:'Budi', batchNumber:'BN-20241105-001' }],
+        alasan:'BELUM_DIVERIFIKASI', eta:'2024-11-13', pic:'Budi' },
+      { id:'0102-2', product:'P5', qtySj:80, qtyCancelled:0, decision:'WAITING',
+        receipts:[], alasan:'BELUM_DATANG_SUPPLIER', eta:'2024-11-15', pic:'Budi' },
+    ]},
+    { no:'SJ/2024/0103', date:'2024-11-05', customer:'C3', po:'PO-7802', lines:[
+      { id:'0103-1', product:'P4', qtySj:30, qtyCancelled:0, decision:'DONE',
+        receipts:[{ qty:30, rackId:'R4-01', date:'2024-11-06', pic:'Citra', batchNumber:'BN-20241106-001' }] },
+      { id:'0103-2', product:'P1', qtySj:40, qtyCancelled:0, decision:'OPEN', receipts:[] },
+    ]},
+    { no:'SJ/2024/0104', date:'2024-10-28', customer:'C1', po:'PO-7710', lines:[
+      { id:'0104-1', product:'P2', qtySj:25, qtyCancelled:0, decision:'WAITING',
+        receipts:[], alasan:'BELUM_READY_PRODUKSI', eta:'2024-11-20', pic:'Andi' },
+      { id:'0104-2', product:'P5', qtySj:15, qtyCancelled:0, decision:'DONE',
+        receipts:[{ qty:15, rackId:'R2-02', date:'2024-10-30', pic:'Andi', batchNumber:'BN-20241030-001' }] },
+    ]},
+    { no:'SJ/2024/0105', date:'2024-11-08', customer:'C2', po:'PO-7815', lines:[
+      { id:'0105-1', product:'P3', qtySj:50, qtyCancelled:0, decision:'OPEN', receipts:[] },
+    ]},
+    { no:'SJ/2024/0106', date:'2024-11-09', customer:'C3', po:'PO-7820', lines:[
+      { id:'0106-1', product:'P4', qtySj:60, qtyCancelled:0, decision:'WAITING',
+        receipts:[], alasan:'SALAH_INPUT', eta:'2024-11-12', pic:'Citra' },
+    ]},
+    { no:'SJ/2024/0107', date:'2024-11-06', customer:'C4', po:'PO-7825', lines:[
+      { id:'0107-1', product:'P1', qtySj:20, qtyCancelled:20, decision:'DONE', receipts:[] },
+    ]},
+  ],
+  shipments: [
+    { no:'DO-TTR-001', date:'2024-11-06', customer:'C1', status:'DELIVERED', pod:'2024-11-07',
+      driver:'Sutrisno', vehicle:'B 9123 XYZ', note:'',
+      printCount:1, lastPrintedAt:'06/11/24 09.14',
+      lines:[{ product:'P1', qty:30, rackId:'R2-01' }] },
+    { no:'DO-TTR-002', date:'2024-11-10', customer:'C2', status:'SHIPPED', pod:null,
+      driver:'Joko', vehicle:'B 8877 ABC', note:'',
+      printCount:0, lastPrintedAt:null,
+      lines:[{ product:'P3', qty:40, rackId:'R3-01' }] },
+    { no:'DO-TTR-003', date:'2024-11-11', customer:'C3', status:'DRAFT', pod:null,
+      driver:'', vehicle:'', note:'',
+      printCount:0, lastPrintedAt:null,
+      lines:[{ product:'P4', qty:10, rackId:'R4-01' }] },
+  ],
+};
+
+/* =========================================================
+   2. UTILITAS
+   ========================================================= */
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n ?? 0).toLocaleString('id-ID');
+const cust = (id) => db.customers.find(c => c.id === id) || { id, code:'—', name:'—', address:'—', phone:'—' };
+const prod = (id) => db.products.find(p => p.id === id) || { id, code:'—', name:'—', unit:'' };
+const rack = (id) => db.racks.find(r => r.id === id) || { id, code:'—', name:'—' };
+const loc = (id) => db.locations.find(l => l.id === id) || { id, name:'—' };
+const locOfCustomer = (cid) => db.locations.find(l => l.customer === cid);
+function racksOfCustomer(cid){ const l = locOfCustomer(cid); return l ? db.racks.filter(r => r.locationId === l.id) : []; }
+
+function fmtDate(d){
+  if(!d) return '—';
+  const [y,m,dd] = d.split('-');
+  return `${dd} ${MONTHS[+m-1]} ${y}`;
+}
+function daysBetween(a,b){
+  const A = new Date(a + 'T00:00:00');
+  const B = new Date(b + 'T00:00:00');
+  return Math.round((B - A) / 86400000);
+}
+const aging = (d) => daysBetween(d, TODAY);
+function nowStamp(){
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getFullYear()).slice(-2)} ${String(d.getHours()).padStart(2,'0')}.${String(d.getMinutes()).padStart(2,'0')}`;
+}
+const ALASAN = {
+  BELUM_READY_PRODUKSI:   'Belum ready produksi',
+  BELUM_DATANG_SUPPLIER:  'Belum datang dari supplier',
+  BELUM_DIVERIFIKASI:     'Belum diverifikasi gudang',
+  SALAH_INPUT:            'Salah input / perlu koreksi',
+  LAINNYA:                'Lainnya',
+};
+function nextSJNumber(){
+  let max = 0;
+  db.sj.forEach(s => { const m = s.no.match(/(\d+)$/); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+  const year = TODAY.split('-')[0];
+  return `SJ/${year}/${String(max + 1).padStart(4, '0')}`;
+}
+function suggestBatchNumber(date){
+  if (!date) date = TODAY;
+  const dateStr = date.replace(/-/g, '');
+  let count = 0;
+  db.sj.forEach(s => s.lines.forEach(l => { (l.receipts || []).forEach(r => { if (r.date === date) count++; }); }));
+  return `BN-${dateStr}-${String(count + 1).padStart(3, '0')}`;
+}
+
+/* =========================================================
+   3. KOMPUTASI SJ LINE
+   ========================================================= */
+const qtyReceived = (l) => (l.receipts || []).reduce((a,r) => a + r.qty, 0);
+const pendingOf   = (l) => l.qtySj - qtyReceived(l) - l.qtyCancelled;
+
+function lineStatus(l){
+  const pending = pendingOf(l);
+  if (pending <= 0) return l.qtyCancelled >= l.qtySj ? 'CANCELLED' : 'RECEIVED';
+  if (qtyReceived(l) > 0) return 'PARTIALLY_RECEIVED';
+  if (l.decision === 'WAITING') return 'WAITING_PHYSICAL';
+  return 'OPEN';
+}
+const STATUS_META = {
+  OPEN:               { label:'Belum diklasifikasi', cls:'b-gray'  },
+  WAITING_PHYSICAL:   { label:'Fisik belum ada',     cls:'b-amber' },
+  PARTIALLY_RECEIVED: { label:'Diterima sebagian',   cls:'b-blue'  },
+  RECEIVED:           { label:'Diterima',            cls:'b-green' },
+  CANCELLED:          { label:'Dibatalkan',          cls:'b-red'   },
+};
+function badge(status){
+  const m = STATUS_META[status] || STATUS_META.OPEN;
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+function sjStatus(s){
+  const st = s.lines.map(lineStatus);
+  if (st.every(x => x === 'RECEIVED' || x === 'CANCELLED')) return 'RECEIVED';
+  if (st.some(x => x === 'WAITING_PHYSICAL' || x === 'PARTIALLY_RECEIVED')) return 'WAITING_PHYSICAL';
+  return 'OPEN';
+}
+function allPending(){
+  const rows = [];
+  db.sj.forEach(s => s.lines.forEach(l => {
+    const st = lineStatus(l);
+    if (st === 'WAITING_PHYSICAL' || st === 'PARTIALLY_RECEIVED') {
+      rows.push({ sj:s, line:l, status:st, pending:pendingOf(l), umur: aging(s.date) });
+    }
+  }));
+  return rows.sort((a,b) => b.umur - a.umur);
+}
+function allOpen(){
+  const rows = [];
+  db.sj.forEach(s => s.lines.forEach(l => {
+    if (lineStatus(l) === 'OPEN') rows.push({ sj:s, line:l, pending:pendingOf(l) });
+  }));
+  return rows;
+}
+
+/* =========================================================
+   4. BATCH LEDGER
+   ========================================================= */
+function buildBatches(){
+  const batches = [];
+  db.sj.forEach(s => s.lines.forEach(l => {
+    (l.receipts || []).forEach((r, idx) => {
+      batches.push({
+        id: s.no + '|' + l.id + '|' + idx,
+        sjNo: s.no, sjDate: s.date, po: s.po,
+        product: l.product, rackId: r.rackId, customer: s.customer,
+        batchNumber: r.batchNumber || '—',
+        qtyIn: r.qty, dateIn: r.date, pic: r.pic
+      });
+    });
+  }));
+  return batches;
+}
+function initConsumption(){
+  const batches = buildBatches();
+  const consumed = {};
+  db.shipments.forEach(sh => sh.lines.forEach(l => { l.consumed = []; }));
+  const sorted = [...db.shipments].sort((a,b) => a.date.localeCompare(b.date));
+  sorted.forEach(sh => {
+    if (sh.status === 'DRAFT') return;
+    sh.lines.forEach(l => {
+      let remaining = l.qty;
+      const candidates = batches
+        .filter(b => b.product === l.product && b.rackId === l.rackId
+                  && b.customer === sh.customer && b.dateIn <= sh.date)
+        .sort((a,b) => a.dateIn.localeCompare(b.dateIn) || a.id.localeCompare(b.id));
+      for (const b of candidates) {
+        if (remaining <= 0) break;
+        const used = consumed[b.id] || 0;
+        const avail = b.qtyIn - used;
+        if (avail <= 0) continue;
+        const take = Math.min(remaining, avail);
+        l.consumed.push({ batchId: b.id, sjNo: b.sjNo, batchNumber: b.batchNumber, qty: take });
+        consumed[b.id] = used + take;
+        remaining -= take;
+      }
+    });
+  });
+}
+function stockByBatch(){
+  const batches = buildBatches();
+  const consumed = {};
+  db.shipments.forEach(sh => {
+    if (sh.status === 'DRAFT') return;
+    (sh.lines || []).forEach(l => { (l.consumed || []).forEach(c => { consumed[c.batchId] = (consumed[c.batchId] || 0) + c.qty; }); });
+  });
+  return batches.map(b => ({ ...b, qtyOut: consumed[b.id] || 0, qtyAvail: b.qtyIn - (consumed[b.id] || 0) })).filter(b => b.qtyAvail > 0);
+}
+function getAvailableBatchesForCustomer(cid){ return stockByBatch().filter(b => b.customer === cid); }
+function stockRows(){
+  return stockByBatch().map(b => {
+    const r = rack(b.rackId);
+    return {
+      batchId: b.id, sjNo: b.sjNo, sjDate: b.sjDate, batchNumber: b.batchNumber,
+      product: b.product, rack: r, location: loc(r.locationId),
+      customer: b.customer, qty: b.qtyAvail, lastIn: b.dateIn
+    };
+  }).sort((a,b) => {
+    const ca = cust(a.customer).name, cb = cust(b.customer).name;
+    if (ca !== cb) return ca.localeCompare(cb);
+    if (a.sjNo !== b.sjNo) return a.sjNo.localeCompare(b.sjNo);
+    return a.product.localeCompare(b.product);
+  });
+}
+const movements = [];
+function initMovements(){
+  movements.length = 0;
+  db.sj.forEach(s => s.lines.forEach(l => {
+    (l.receipts || []).forEach(r => movements.push({
+      date: r.date, type:'CONSIGN_IN', ref: s.no, product: l.product,
+      customer: s.customer, rackId: r.rackId, qty: r.qty,
+      batchNumber: r.batchNumber || '—', note: 'Penerimaan fisik', sjRef: s.no
+    }));
+  }));
+  db.shipments.forEach(sh => {
+    if (sh.status === 'DRAFT') return;
+    sh.lines.forEach(l => {
+      const sjRefs = (l.consumed || []).map(c => c.sjNo).join(', ');
+      const batchRefs = (l.consumed || []).map(c => c.batchNumber).join(', ');
+      movements.push({
+        date: sh.date, type:'CONSIGN_OUT', ref: sh.no, product: l.product,
+        customer: sh.customer, rackId: l.rackId, qty: -l.qty,
+        batchNumber: batchRefs || '—', note: 'Pengiriman', sjRef: sjRefs
+      });
+    });
+  });
+  movements.sort((a,b) => a.date < b.date ? 1 : -1);
+}
+
+/* =========================================================
+   5. KARTU STOCK BUILDER
+   ========================================================= */
+function buildKartuStockEntries(filter){
+  const code = (filter.code || '').trim().toLowerCase();
+  const batch = (filter.batch || '').trim().toLowerCase();
+  const customer = filter.customer || '';
+  const fromDate = filter.from || '';
+  const toDate = filter.to || '';
+  const all = [];
+
+  db.sj.forEach(s => {
+    if (customer && s.customer !== customer) return;
+    s.lines.forEach(l => {
+      const p = prod(l.product);
+      if (code && !p.code.toLowerCase().includes(code)) return;
+      (l.receipts || []).forEach(r => {
+        const bn = r.batchNumber || '—';
+        if (batch && !bn.toLowerCase().includes(batch)) return;
+        if (fromDate && r.date < fromDate) return;
+        if (toDate && r.date > toDate) return;
+        all.push({
+          date: r.date, type:'IN', ref: s.no,
+          product: l.product, customer: s.customer,
+          batchNumber: bn, rackId: r.rackId,
+          in: r.qty, out: 0, note: 'Penerimaan fisik'
+        });
+      });
+    });
+  });
+  db.shipments.forEach(sh => {
+    if (sh.status === 'DRAFT') return;
+    if (customer && sh.customer !== customer) return;
+    sh.lines.forEach(l => {
+      const p = prod(l.product);
+      if (code && !p.code.toLowerCase().includes(code)) return;
+      (l.consumed || []).forEach(c => {
+        const bn = c.batchNumber || '—';
+        if (batch && !bn.toLowerCase().includes(batch)) return;
+        if (fromDate && sh.date < fromDate) return;
+        if (toDate && sh.date > toDate) return;
+        all.push({
+          date: sh.date, type:'OUT', ref: sh.no,
+          product: l.product, customer: sh.customer,
+          batchNumber: bn, rackId: l.rackId,
+          in: 0, out: c.qty, note: 'Pengiriman'
+        });
+      });
+    });
+  });
+
+  const groups = {};
+  all.forEach(e => {
+    const k = e.customer + '|' + e.product + '|' + e.batchNumber;
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(e);
+  });
+  const result = [];
+  Object.values(groups).forEach(arr => {
+    arr.sort((a,b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      if (a.type !== b.type) return a.type === 'IN' ? -1 : 1;
+      return 0;
+    });
+    let bal = 0;
+    arr.forEach((e, idx) => {
+      bal += e.in - e.out;
+      e.balance = bal;
+      e.isGroupEnd = idx === arr.length - 1;
+      result.push(e);
+    });
+  });
+  result.sort((a,b) => {
+    const ca = cust(a.customer).name, cb = cust(b.customer).name;
+    if (ca !== cb) return ca.localeCompare(cb);
+    const pa = prod(a.product).code, pb = prod(b.product).code;
+    if (pa !== pb) return pa.localeCompare(pb);
+    if (a.batchNumber !== b.batchNumber) return a.batchNumber.localeCompare(b.batchNumber);
+    return a.date.localeCompare(b.date);
+  });
+  return result;
+}
+
+/* =========================================================
+   6. STATE UI
+   ========================================================= */
+const ui = {
+  route:'dashboard', q:'', qPending:'', qStok:'', masterTab:'produk',
+  kartuFilter: { code:'', batch:'', customer:'', from:'', to:'' }
+};
+let _shipDraft = null;
+let _sjDraft = null;
+
+const ICON = {
+  dashboard:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  in:'<path d="M4 13h4l2 3h4l2-3h4"/><path d="M6 4h12l2 9v7H4v-7l2-9z"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/>',
+  box:'<path d="M12 3l8.5 4.7v8.6L12 21l-8.5-4.7V7.7L12 3z"/><path d="M3.5 7.7L12 12.4l8.5-4.7"/><path d="M12 12.4V21"/>',
+  truck:'<path d="M2 7h10v9H2z"/><path d="M12 10h4.5l3.5 3.5V16h-8z"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
+  chart:'<path d="M4 20V11"/><path d="M10 20V5"/><path d="M16 20v-6"/><path d="M2 20h20"/>',
+  ledger:'<path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M4 14h16"/><path d="M9 4v16"/>',
+  cog:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+};
+const NAV = [
+  { id:'dashboard',  label:'Dashboard',       icon:'dashboard' },
+  { id:'penerimaan', label:'Penerimaan SJ',   icon:'in' },
+  { id:'pending',    label:'Fisik Belum Ada', icon:'clock', badge: () => allPending().length },
+  { id:'stok',       label:'Stok Titipan',    icon:'box' },
+  { id:'pengiriman', label:'Pengiriman',      icon:'truck' },
+  { id:'kartu',      label:'Kartu Stock',     icon:'ledger' },
+  { id:'laporan',    label:'Rekonsiliasi',    icon:'chart' },
+  { id:'master',     label:'Master Data',     icon:'cog' },
+];
+const PAGES = {
+  dashboard:  ['Dashboard', 'Ringkasan stok titipan dan pending fisik', renderDashboard],
+  penerimaan: ['Penerimaan SJ', 'Surat jalan existing & baru sebagai dokumen masuk gudang titipan', renderPenerimaan],
+  pending:    ['Fisik Belum Ada', 'Antrean penerimaan fisik yang belum diterima', renderPending],
+  stok:       ['Stok Titipan', 'Posisi stok per SJ, batch, produk, dan lokasi rak', renderStok],
+  pengiriman: ['Pengiriman', 'Pengiriman keluar dari gudang titipan ke pelanggan', renderPengiriman],
+  kartu:      ['Kartu Stock', 'Penelusuran mutasi per kode produk, batch, dan pelanggan', renderKartuStock],
+  laporan:    ['Rekonsiliasi', 'Exception report dan riwayat mutasi', renderLaporan],
+  master:     ['Master Data', 'Kelola produk, pelanggan, gudang, dan rak', renderMaster],
+};
+
+/* =========================================================
+   7. RENDER SHELL
+   ========================================================= */
+function render(){
+  $('nav').innerHTML = NAV.map(n => {
+    const b = n.badge ? n.badge() : 0;
+    return `<button class="nav-item ${ui.route === n.id ? 'active' : ''}" onclick="go('${n.id}')">
+      <svg viewBox="0 0 24 24">${ICON[n.icon]}</svg>
+      <span>${n.label}</span>
+      ${b ? `<span class="nav-badge">${b}</span>` : ''}
+    </button>`;
+  }).join('');
+  const [title, sub, fn] = PAGES[ui.route];
+  $('pageTitle').textContent = title;
+  $('pageSub').textContent = sub;
+  $('view').innerHTML = fn();
+  $('todayLabel').textContent = fmtDate(TODAY);
+}
+function go(route){ ui.route = route; render(); window.scrollTo({top:0}); }
+
+/* =========================================================
+   8. HELPER UI
+   ========================================================= */
+function statCard(label, value, unit, foot, accent){
+  return `<div class="stat" style="--accent:${accent}">
+    <div class="stat-label">${label}</div>
+    <div class="stat-value">${value}<small>${unit}</small></div>
+    <div class="stat-foot">${foot}</div>
+  </div>`;
+}
+function umurBadge(days){
+  const cls = days > 30 ? 'b-red' : days > 7 ? 'b-amber' : 'b-gray';
+  return `<span class="badge ${cls}">${days} hari</span>`;
+}
+const kodeTag  = (code) => `<span class="kode">${code}</span>`;
+const rakTag   = (code) => `<span class="rak">📍 ${code}</span>`;
+const sjTag    = (no)   => `<span class="sjtag">SJ ${no}</span>`;
+const batchTag = (bn)   => `<span class="batchtag">🏷 ${bn}</span>`;
+function printBadge(sh){
+  if (!sh.printCount) return '';
+  return `<span class="print-badge" title="Terakhir dicetak: ${sh.lastPrintedAt}">🖨 ${sh.printCount}×</span>`;
+}
+
+/* =========================================================
+   9. HALAMAN: DASHBOARD
+   ========================================================= */
+function renderDashboard(){
+  const pending = allPending();
+  const open = allOpen();
+  const stok = stockRows();
+  const totalStok = stok.reduce((a,r) => a + r.qty, 0);
+  const totalPending = pending.reduce((a,r) => a + r.pending, 0);
+  const sjBelumSelesai = db.sj.filter(s => {
+    const st = sjStatus(s);
+    return st !== 'RECEIVED' && st !== 'CANCELLED';
+  }).length;
+  const belumPod = db.shipments.filter(s => s.status === 'SHIPPED');
+  const umurTertua = pending.length ? Math.max(...pending.map(p => p.umur)) : 0;
+  const perCustomer = {};
+  stok.forEach(r => { perCustomer[r.customer] = (perCustomer[r.customer] || 0) + r.qty; });
+
+  const topPending = pending.slice(0, 5).map(p => {
+    const pr = prod(p.line.product);
+    return `<tr>
+      <td><div class="mono">${p.sj.no}</div><div class="sub">${fmtDate(p.sj.date)}</div></td>
+      <td>${cust(p.sj.customer).name}</td>
+      <td><div>${pr.name}</div><div class="sub">${kodeTag(pr.code)}</div></td>
+      <td class="num"><b>${fmt(p.pending)}</b> <span class="sub">${pr.unit}</span></td>
+      <td>${umurBadge(p.umur)}</td>
+      <td>${fmtDate(p.line.eta)}</td>
+      <td class="num"><button class="btn btn-sm btn-ok" onclick="go('pending')">Tinjau</button></td>
+    </tr>`;
+  }).join('');
+
+  const stokRowsHtml = Object.keys(perCustomer).map(cid => `
+    <tr>
+      <td><b>${cust(cid).name}</b><div class="sub">${locOfCustomer(cid)?.name || '—'}</div></td>
+      <td class="num"><b>${fmt(perCustomer[cid])}</b> unit</td>
+      <td class="num"><span class="badge b-purple">${stok.filter(r => r.customer === cid).length} batch</span></td>
+    </tr>`).join('');
+
+  return `
+    <div class="cards">
+      ${statCard('Stok Titipan', fmt(totalStok), 'unit', `${stok.length} batch • ${Object.keys(perCustomer).length} pelanggan`, '#4f46e5')}
+      ${statCard('Fisik Belum Ada', fmt(totalPending), 'unit', `${pending.length} baris • tertua ${umurTertua} hari`, '#d97706')}
+      ${statCard('SJ Belum Selesai', fmt(sjBelumSelesai), 'SJ', `${open.length} baris belum diklasifikasi`, '#2563eb')}
+      ${statCard('Belum Ada POD', fmt(belumPod.length), 'DO', 'Pengiriman keluar, bukti terima belum masuk', '#0e9f6e')}
+    </div>
+    <div class="callout callout-amber">
+      <div>⚠️</div>
+      <div><b>Perhatian:</b> ${pending.length} baris surat jalan sudah memotong stok di sistem existing,
+      tetapi fisiknya belum diterima di gudang titipan. Total <b>${fmt(totalPending)} unit</b> menggantung.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Pending Fisik — Prioritas</div>
+          <div class="panel-sub">Diurutkan berdasarkan umur titipan</div></div>
+        <div class="panel-actions"><button class="btn" onclick="go('pending')">Lihat semua</button></div>
+      </div>
+      <div class="panel-body">
+        ${pending.length ? `<table class="tbl">
+          <thead><tr><th>Surat Jalan</th><th>Pelanggan</th><th>Produk</th>
+            <th class="num">Qty Pending</th><th>Umur</th><th>ETA</th><th></th></tr></thead>
+          <tbody>${topPending}</tbody>
+        </table>` : `<div class="empty"><b>Tidak ada pending fisik</b></div>`}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Stok per Pelanggan</div></div>
+        <div class="panel-actions"><button class="btn" onclick="go('stok')">Detail stok</button></div>
+      </div>
+      <div class="panel-body">
+        <table class="tbl">
+          <thead><tr><th>Pelanggan / Lokasi</th><th class="num">Qty Titipan</th><th class="num">Batch</th></tr></thead>
+          <tbody>${stokRowsHtml || '<tr><td colspan="3" class="empty">Belum ada stok titipan.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* =========================================================
+   10. HALAMAN: PENERIMAAN SJ
+   ========================================================= */
+function renderPenerimaan(){
+  const q = ui.q.toLowerCase();
+  const list = db.sj.filter(s => {
+    if (!q) return true;
+    return s.no.toLowerCase().includes(q)
+      || cust(s.customer).name.toLowerCase().includes(q)
+      || s.po.toLowerCase().includes(q);
+  });
+  const cards = list.map(s => {
+    const st = sjStatus(s);
+    const rows = s.lines.map(l => {
+      const status = lineStatus(l);
+      const p = prod(l.product);
+      const pending = pendingOf(l);
+      const received = qtyReceived(l);
+      let actions = '';
+      if (status === 'OPEN') {
+        actions = `<div class="btn-group">
+          <button class="btn btn-sm btn-ok" onclick="openReceive('${s.no}','${l.id}')">Fisik Ada</button>
+          <button class="btn btn-sm btn-warn" onclick="openWait('${s.no}','${l.id}')">Fisik Belum Ada</button>
+        </div>`;
+      } else if (status === 'WAITING_PHYSICAL') {
+        actions = `<div class="btn-group">
+          <button class="btn btn-sm btn-ok" onclick="openReceive('${s.no}','${l.id}')">Fisik Ada</button>
+          <button class="btn btn-sm btn-danger" onclick="openCancel('${s.no}','${l.id}')">Batalkan</button>
+        </div>`;
+      } else if (status === 'PARTIALLY_RECEIVED') {
+        actions = `<div class="btn-group">
+          <button class="btn btn-sm btn-ok" onclick="openReceive('${s.no}','${l.id}')">Fisik Ada</button>
+          <button class="btn btn-sm btn-danger" onclick="openCancel('${s.no}','${l.id}')">Batalkan sisa</button>
+        </div>`;
+      } else { actions = `<span class="sub">—</span>`; }
+      const info = status === 'WAITING_PHYSICAL' || status === 'PARTIALLY_RECEIVED'
+        ? `<div class="sub">${ALASAN[l.alasan] || '—'} • ETA ${fmtDate(l.eta)} • PIC ${l.pic || '—'}</div>` : '';
+      const rackList = (l.receipts || []).map(r =>
+        `<div class="sub" style="margin-top:4px">${batchTag(r.batchNumber || '—')} ${rakTag(rack(r.rackId).code)} ${fmt(r.qty)} ${p.unit} • ${fmtDate(r.date)}</div>`
+      ).join('');
+      return `<tr>
+        <td><div><b>${p.name}</b></div><div class="sub">${kodeTag(p.code)}</div></td>
+        <td class="num">${fmt(l.qtySj)} <span class="sub">${p.unit}</span></td>
+        <td class="num">${fmt(received)}${rackList}</td>
+        <td class="num"><b>${fmt(pending)}</b></td>
+        <td>${badge(status)}${info}</td>
+        <td class="num">${actions}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="sj-card">
+      <div class="sj-head">
+        <div>
+          <div class="sj-no">${s.no}</div>
+          <div class="sj-meta">
+            <span>Tanggal <b>${fmtDate(s.date)}</b></span>
+            <span>Pelanggan <b>${cust(s.customer).name}</b></span>
+            <span>PO <b>${s.po}</b></span>
+          </div>
+        </div>
+        <div>${badge(st)}</div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Produk / Kode</th><th class="num">Qty SJ</th><th class="num">Diterima & Batch & Rak</th>
+          <th class="num">Pending</th><th>Status</th><th class="num">Aksi</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+  return `
+    <div class="callout callout-blue">
+      <div>ℹ️</div>
+      <div><b>Alur:</b> tambah SJ sebagai dokumen masuk, lalu tiap <b>Fisik Ada</b> menciptakan <b>batch</b>
+      dengan <b>Nomor Batch</b> yang mengalir ke stok, pengiriman, dan surat jalan.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Daftar Surat Jalan</div>
+          <div class="panel-sub">${db.sj.length} SJ terdaftar</div></div>
+        <div class="panel-actions">
+          <input class="input" placeholder="Cari no SJ / pelanggan / PO…"
+                 value="${ui.q}" oninput="ui.q=this.value;render()">
+          <button class="btn btn-primary" onclick="openAddSJ()">+ Tambah Penerimaan SJ</button>
+        </div>
+      </div>
+    </div>
+    ${cards || `<div class="panel"><div class="empty"><b>Tidak ada surat jalan</b>Ubah kata kunci atau tambah SJ baru.</div></div>`}`;
+}
+
+/* =========================================================
+   11. HALAMAN: FISIK BELUM ADA
+   ========================================================= */
+function renderPending(){
+  const q = ui.qPending.toLowerCase();
+  let rows = allPending();
+  if (q) rows = rows.filter(r =>
+    r.sj.no.toLowerCase().includes(q) || cust(r.sj.customer).name.toLowerCase().includes(q) ||
+    prod(r.line.product).name.toLowerCase().includes(q) || prod(r.line.product).code.toLowerCase().includes(q));
+  const totalQty = rows.reduce((a,r) => a + r.pending, 0);
+  const bucket = (min, max) => rows.filter(r => r.umur >= min && r.umur <= max).length;
+
+  const body = rows.map(r => {
+    const p = prod(r.line.product);
+    return `<tr>
+      <td><div class="mono">${r.sj.no}</div><div class="sub">${fmtDate(r.sj.date)}</div></td>
+      <td><b>${cust(r.sj.customer).name}</b></td>
+      <td><div>${p.name}</div><div class="sub">${kodeTag(p.code)}</div></td>
+      <td class="num">${fmt(r.line.qtySj)}</td>
+      <td class="num">${fmt(qtyReceived(r.line))}</td>
+      <td class="num"><b>${fmt(r.pending)}</b></td>
+      <td>${umurBadge(r.umur)}</td>
+      <td><div>${ALASAN[r.line.alasan] || '—'}</div><div class="sub">PIC ${r.line.pic || '—'}</div></td>
+      <td>${fmtDate(r.line.eta)}</td>
+      <td class="num"><div class="btn-group">
+        <button class="btn btn-sm btn-ok" onclick="openReceive('${r.sj.no}','${r.line.id}')">Fisik Ada</button>
+        <button class="btn btn-sm btn-danger" onclick="openCancel('${r.sj.no}','${r.line.id}')">Batalkan</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="cards">
+      ${statCard('Total Baris Pending', fmt(rows.length), 'baris', 'Menunggu konfirmasi fisik', '#d97706')}
+      ${statCard('Total Qty Pending', fmt(totalQty), 'unit', 'Belum masuk stok titipan', '#b45309')}
+      ${statCard('Umur 0–7 hari', fmt(bucket(0,7)), 'baris', 'Masih dalam SLA', '#2563eb')}
+      ${statCard('Umur > 30 hari', fmt(bucket(31,9999)), 'baris', 'Perlu eskalasi', '#b42318')}
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Antrean Penerimaan Fisik</div>
+          <div class="panel-sub">Klik <b>Fisik Ada</b> untuk membuat batch baru dari SJ ini</div></div>
+        <div class="panel-actions">
+          <input class="input" placeholder="Cari SJ / pelanggan / produk…"
+                 value="${ui.qPending}" oninput="ui.qPending=this.value;render()">
+        </div>
+      </div>
+      <div class="panel-body">
+        ${rows.length ? `<table class="tbl">
+          <thead><tr><th>Surat Jalan</th><th>Pelanggan</th><th>Produk</th>
+            <th class="num">Qty SJ</th><th class="num">Diterima</th><th class="num">Pending</th>
+            <th>Umur</th><th>Alasan</th><th>ETA</th><th class="num">Aksi</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>` : `<div class="empty"><b>Tidak ada pending fisik</b></div>`}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Belum Diklasifikasi</div></div>
+      <div class="panel-body">
+        ${allOpen().length ? `<table class="tbl">
+          <thead><tr><th>Surat Jalan</th><th>Pelanggan</th><th>Produk</th><th class="num">Qty</th><th class="num">Aksi</th></tr></thead>
+          <tbody>${allOpen().map(o => {
+            const p = prod(o.line.product);
+            return `<tr>
+              <td class="mono">${o.sj.no}</td>
+              <td>${cust(o.sj.customer).name}</td>
+              <td>${p.name} <span class="sub">${kodeTag(p.code)}</span></td>
+              <td class="num">${fmt(o.pending)}</td>
+              <td class="num"><div class="btn-group">
+                <button class="btn btn-sm btn-ok" onclick="openReceive('${o.sj.no}','${o.line.id}')">Fisik Ada</button>
+                <button class="btn btn-sm btn-warn" onclick="openWait('${o.sj.no}','${o.line.id}')">Fisik Belum Ada</button>
+              </div></td>
+            </tr>`;}).join('')}</tbody>
+        </table>` : `<div class="empty"><b>Semua sudah diklasifikasi</b></div>`}
+      </div>
+    </div>`;
+}
+
+/* =========================================================
+   12. HALAMAN: STOK (urutan kolom baru, nama rak dihapus)
+   ========================================================= */
+function renderStok(){
+  const q = ui.qStok.toLowerCase();
+  let rows = stockRows();
+  if (q) rows = rows.filter(r =>
+    cust(r.customer).name.toLowerCase().includes(q) ||
+    prod(r.product).name.toLowerCase().includes(q) ||
+    prod(r.product).code.toLowerCase().includes(q) ||
+    r.rack.code.toLowerCase().includes(q) ||
+    r.sjNo.toLowerCase().includes(q) ||
+    r.batchNumber.toLowerCase().includes(q));
+
+  const total = rows.reduce((a,r) => a + r.qty, 0);
+  const perCustomer = {};
+  rows.forEach(r => { perCustomer[r.customer] = (perCustomer[r.customer] || 0) + r.qty; });
+  const rackCount = new Set(rows.map(r => r.rack.id)).size;
+  const sjCount = new Set(rows.map(r => r.sjNo)).size;
+
+  const body = rows.map(r => {
+    const p = prod(r.product);
+    return `<tr>
+      <td><b>${cust(r.customer).name}</b></td>
+      <td>${sjTag(r.sjNo)}<div class="sub">${fmtDate(r.sjDate)}</div></td>
+      <td>${kodeTag(p.code)}</td>
+      <td>${p.name}</td>
+      <td>${batchTag(r.batchNumber)}</td>
+      <td>${rakTag(r.rack.code)}</td>
+      <td class="num"><b>${fmt(r.qty)}</b></td>
+      <td>${p.unit}</td>
+      <td>${r.lastIn ? umurBadge(aging(r.lastIn)) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const summary = Object.keys(perCustomer).map(cid => `
+    <tr>
+      <td>${cust(cid).name}</td>
+      <td class="num"><b>${fmt(perCustomer[cid])}</b> unit</td>
+      <td class="num">${rows.filter(r => r.customer === cid).length} batch</td>
+    </tr>`).join('');
+
+  return `
+    <div class="cards">
+      ${statCard('Total Stok Titipan', fmt(total), 'unit', `${rows.length} batch`, '#4f46e5')}
+      ${statCard('SJ dengan Stok', fmt(sjCount), 'SJ', 'Dokumen sumber aktif', '#2563eb')}
+      ${statCard('Rak Terpakai', fmt(rackCount), 'rak', 'Lokasi penyimpanan fisik', '#0e9f6e')}
+      ${statCard('Belum POD', fmt(db.shipments.filter(s => s.status === 'SHIPPED').length), 'DO', 'Bukti terima belum masuk', '#d97706')}
+    </div>
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Ringkasan per Pelanggan</div></div>
+      <div class="panel-body">
+        <table class="tbl">
+          <thead><tr><th>Pelanggan</th><th class="num">Qty Titipan</th><th class="num">Batch</th></tr></thead>
+          <tbody>${summary || '<tr><td colspan="3" class="empty">Belum ada stok titipan.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Posisi Stok per Batch</div>
+          <div class="panel-sub">Setiap baris = satu batch penerimaan dengan nomor batch unik</div></div>
+        <div class="panel-actions">
+          <input class="input" placeholder="Cari batch / SJ / produk / rak…"
+                 value="${ui.qStok}" oninput="ui.qStok=this.value;render()">
+        </div>
+      </div>
+      <div class="panel-body">
+        ${rows.length ? `<table class="tbl">
+          <thead><tr>
+            <th>Pelanggan</th>
+            <th>SJ Asal</th>
+            <th>Kode Produk</th>
+            <th>Nama Produk</th>
+            <th>Batch</th>
+            <th>Lokasi Rak</th>
+            <th class="num">Qty</th>
+            <th>Satuan</th>
+            <th>Umur</th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>` : `<div class="empty"><b>Belum ada stok titipan</b>Konfirmasi penerimaan fisik terlebih dahulu.</div>`}
+      </div>
+    </div>`;
+}
+
+/* =========================================================
+   13. HALAMAN: PENGIRIMAN
+   ========================================================= */
+function renderPengiriman(){
+  const rows = db.shipments.slice().sort((a,b) => a.date < b.date ? 1 : -1);
+  const body = rows.map(sh => {
+    const qty = sh.lines.reduce((a,l) => a + l.qty, 0);
+    const stBadge = sh.status === 'DELIVERED'
+      ? '<span class="badge b-green">Terkirim + POD</span>'
+      : sh.status === 'SHIPPED'
+        ? '<span class="badge b-blue">Sudah keluar</span>'
+        : '<span class="badge b-gray">Draft</span>';
+    const lines = sh.lines.map(l => {
+      const p = prod(l.product);
+      const sjRefs = (l.consumed || []).map(c => c.sjNo).filter(Boolean).join(', ');
+      const batchRefs = (l.consumed || []).map(c => c.batchNumber).filter(Boolean).join(', ');
+      return `<div style="margin-bottom:6px">
+        ${p.name} <span class="sub">${kodeTag(p.code)} ${rakTag(rack(l.rackId).code)} × ${fmt(l.qty)}</span>
+        ${batchRefs ? `<div class="sub" style="margin-top:2px">${batchTag(batchRefs)}</div>` : ''}
+        ${sjRefs ? `<div class="sub" style="margin-top:2px">dari ${sjTag(sjRefs)}</div>` : ''}
+      </div>`;
+    }).join('');
+    return `<tr>
+      <td><div class="mono">${sh.no}</div>${printBadge(sh)}</td>
+      <td>${fmtDate(sh.date)}</td>
+      <td><b>${cust(sh.customer).name}</b></td>
+      <td>${lines}</td>
+      <td class="num"><b>${fmt(qty)}</b></td>
+      <td>${stBadge}</td>
+      <td>${sh.pod ? fmtDate(sh.pod) : '<span class="sub">—</span>'}</td>
+      <td class="num"><button class="btn btn-sm btn-primary" onclick="printSuratJalan('${sh.no}')">🖨 Cetak SJ</button></td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="cards">
+      ${statCard('Total Pengiriman', fmt(db.shipments.length), 'DO', 'Semua status', '#4f46e5')}
+      ${statCard('Sudah Dikirim', fmt(db.shipments.filter(s => s.status !== 'DRAFT').length), 'DO', 'Stok sudah keluar', '#0e9f6e')}
+      ${statCard('Draft', fmt(db.shipments.filter(s => s.status === 'DRAFT').length), 'DO', 'Belum memotong stok', '#6b7280')}
+      ${statCard('Sudah Dicetak', fmt(db.shipments.filter(s => s.printCount > 0).length), 'DO', 'Surat jalan pernah dicetak', '#2563eb')}
+    </div>
+    <div class="callout callout-blue">
+      <div>🖨️</div>
+      <div><b>Cetak Surat Jalan</b> menampilkan <b>No. Batch</b> dan <b>SJ Asal</b> per baris.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Daftar Pengiriman</div>
+          <div class="panel-sub">Outbound dari gudang titipan</div></div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" onclick="openShipment()">+ Buat Pengiriman</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <table class="tbl">
+          <thead><tr><th>No DO</th><th>Tanggal</th><th>Pelanggan</th><th>Produk / Batch / SJ Asal</th>
+            <th class="num">Qty</th><th>Status</th><th>POD</th><th class="num">Aksi</th></tr></thead>
+          <tbody>${body || '<tr><td colspan="8" class="empty">Belum ada pengiriman.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* =========================================================
+   14. HALAMAN: KARTU STOCK (urutan kolom baru, tanpa Tipe)
+   ========================================================= */
+function renderKartuStock(){
+  return `
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Filter Kartu Stock</div>
+          <div class="panel-sub">Kosongkan filter untuk menampilkan semua mutasi</div></div>
+      </div>
+      ${renderKartuFilterForm()}
+    </div>
+    <div id="ksResults">${renderKartuResults()}</div>
+  `;
+}
+function renderKartuFilterForm(){
+  const f = ui.kartuFilter;
+  return `
+    <div class="ks-form">
+      <div class="field" style="margin:0">
+        <label>Kode Produk</label>
+        <input type="text" value="${f.code}" placeholder="PRD-001" oninput="onKsInput('code', this.value)">
+      </div>
+      <div class="field" style="margin:0">
+        <label>No. Batch</label>
+        <input type="text" value="${f.batch}" placeholder="BN-20241103-001" oninput="onKsInput('batch', this.value)">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Pelanggan</label>
+        <select onchange="onKsInput('customer', this.value)">
+          <option value="">— Semua Pelanggan —</option>
+          ${db.customers.map(c => `<option value="${c.id}" ${f.customer===c.id?'selected':''}>${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Dari Tanggal</label>
+        <input type="date" value="${f.from}" onchange="onKsInput('from', this.value)">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Sampai Tanggal</label>
+        <input type="date" value="${f.to}" onchange="onKsInput('to', this.value)">
+      </div>
+      <div class="field" style="margin:0">
+        <label>&nbsp;</label>
+        <button class="btn" style="width:100%" onclick="resetKartuFilter()">↺ Reset Filter</button>
+      </div>
+    </div>
+  `;
+}
+function renderKartuResults(){
+  const f = ui.kartuFilter;
+  const entries = buildKartuStockEntries(f);
+  const totalIn = entries.reduce((a,e) => a + e.in, 0);
+  const totalOut = entries.reduce((a,e) => a + e.out, 0);
+  const saldo = totalIn - totalOut;
+  const groupSet = new Set(entries.map(e => e.customer + '|' + e.product + '|' + e.batchNumber));
+  const hasFilter = !!(f.code || f.batch || f.customer || f.from || f.to);
+
+  let lastKey = '';
+  const rows = entries.map(e => {
+    const p = prod(e.product);
+    const r = rack(e.rackId);
+    const key = e.customer + '|' + e.product + '|' + e.batchNumber;
+    const isNewGroup = key !== lastKey;
+    lastKey = key;
+    const isLast = e.isGroupEnd;
+    const saldoCls = isLast ? 'balance-final' : 'saldo-cell';
+
+    return `<tr class="${isNewGroup ? 'batch-start' : ''}">
+      <td>${fmtDate(e.date)}</td>
+      <td>${cust(e.customer).name}</td>
+      <td>
+        <div class="mono">${e.ref}</div>
+        <span class="ref-type ${e.type === 'IN' ? 'ref-in' : 'ref-out'}">${e.type === 'IN' ? 'MASUK' : 'KELUAR'}</span>
+      </td>
+      <td>${kodeTag(p.code)}</td>
+      <td>${batchTag(e.batchNumber)}</td>
+      <td>${rakTag(r.code)}</td>
+      <td class="in-cell">${e.in ? '+' + fmt(e.in) : '—'}</td>
+      <td class="out-cell">${e.out ? '−' + fmt(e.out) : '—'}</td>
+      <td class="num ${saldoCls}">${fmt(e.balance)}</td>
+    </tr>`;
+  }).join('');
+
+  const filterChips = [];
+  if (f.code)     filterChips.push(`Kode: <b>${f.code}</b>`);
+  if (f.batch)    filterChips.push(`Batch: <b>${f.batch}</b>`);
+  if (f.customer) filterChips.push(`Pelanggan: <b>${cust(f.customer).name}</b>`);
+  if (f.from)     filterChips.push(`Dari: <b>${fmtDate(f.from)}</b>`);
+  if (f.to)       filterChips.push(`Sampai: <b>${fmtDate(f.to)}</b>`);
+
+  return `
+    <div class="cards">
+      ${statCard('Total Masuk', fmt(totalIn), 'unit', hasFilter ? 'Sesuai filter' : 'Semua penerimaan', '#0e9f6e')}
+      ${statCard('Total Keluar', fmt(totalOut), 'unit', hasFilter ? 'Sesuai filter' : 'Semua pengiriman', '#2563eb')}
+      ${statCard('Saldo', fmt(saldo), 'unit', 'Masuk − keluar', '#4f46e5')}
+      ${statCard('Batch Terlibat', fmt(groupSet.size), 'batch', hasFilter ? 'Hasil filter' : 'Semua batch', '#9333ea')}
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">Kartu Stock — Penelusuran Mutasi</div>
+          <div class="panel-sub">${entries.length} mutasi ${hasFilter ? 'cocok filter' : 'tercatat'} • saldo berjalan per batch</div>
+        </div>
+        ${hasFilter ? `<div class="panel-actions">
+          <span class="sub">${filterChips.join(' &nbsp;•&nbsp; ')}</span>
+        </div>` : ''}
+      </div>
+      <div class="panel-body">
+        ${entries.length ? `<table class="tbl ks-tbl">
+          <thead><tr>
+            <th>Tanggal</th>
+            <th>Pelanggan</th>
+            <th>Referensi</th>
+            <th>Kode Produk</th>
+            <th>Batch</th>
+            <th>Rak</th>
+            <th class="num">Masuk</th>
+            <th class="num">Keluar</th>
+            <th class="num">Saldo</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : `<div class="empty">
+          <b>Tidak ada mutasi</b>
+          ${hasFilter
+            ? 'Tidak ada mutasi yang cocok dengan filter. Coba ubah atau <button class="btn btn-sm" style="margin-left:6px" onclick="resetKartuFilter()">Reset</button>'
+            : 'Belum ada mutasi tercatat.'}
+        </div>`}
+      </div>
+    </div>
+  `;
+}
+function onKsInput(field, value){
+  ui.kartuFilter[field] = value;
+  const el = document.getElementById('ksResults');
+  if (el) el.innerHTML = renderKartuResults();
+}
+function resetKartuFilter(){
+  ui.kartuFilter = { code:'', batch:'', customer:'', from:'', to:'' };
+  render();
+}
+
+/* =========================================================
+   15. HALAMAN: REKONSILIASI
+   ========================================================= */
+function renderLaporan(){
+  const pending = allPending();
+  const stok = stockRows();
+  const totalStok = stok.reduce((a,r) => a + r.qty, 0);
+  const totalPending = pending.reduce((a,r) => a + r.pending, 0);
+  const totalMasuk = movements.filter(m => m.qty > 0).reduce((a,m) => a + m.qty, 0);
+  const totalKeluar = movements.filter(m => m.qty < 0).reduce((a,m) => a + Math.abs(m.qty), 0);
+
+  const exception = pending.map(r => {
+    const p = prod(r.line.product);
+    return `<tr>
+      <td class="mono">${r.sj.no}</td>
+      <td>${cust(r.sj.customer).name}</td>
+      <td>${p.name} <span class="sub">${kodeTag(p.code)}</span></td>
+      <td class="num"><b>${fmt(r.pending)}</b></td>
+      <td>${umurBadge(r.umur)}</td>
+      <td>${ALASAN[r.line.alasan] || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const mutasi = movements.slice(0, 15).map(m => `
+    <tr>
+      <td>${fmtDate(m.date)}</td>
+      <td>${m.type === 'CONSIGN_IN'
+        ? '<span class="badge b-green">MASUK</span>'
+        : '<span class="badge b-blue">KELUAR</span>'}</td>
+      <td>
+        <div class="mono">${m.ref}</div>
+        ${m.sjRef && m.type === 'CONSIGN_OUT' ? `<div class="sub">dari ${sjTag(m.sjRef)}</div>` : ''}
+      </td>
+      <td>${m.batchNumber ? batchTag(m.batchNumber) : '—'}</td>
+      <td>${cust(m.customer).name}</td>
+      <td>${prod(m.product).name} <span class="sub">${kodeTag(prod(m.product).code)}</span></td>
+      <td>${rakTag(rack(m.rackId).code)}</td>
+      <td class="num"><b style="color:${m.qty > 0 ? '#0e7a55' : '#b42318'}">${m.qty > 0 ? '+' : ''}${fmt(m.qty)}</b></td>
+    </tr>`).join('');
+
+  return `
+    <div class="cards">
+      ${statCard('Total Masuk', fmt(totalMasuk), 'unit', 'Akumulasi penerimaan fisik', '#0e9f6e')}
+      ${statCard('Total Keluar', fmt(totalKeluar), 'unit', 'Akumulasi pengiriman', '#2563eb')}
+      ${statCard('Stok Titipan', fmt(totalStok), 'unit', 'Masuk − keluar', '#4f46e5')}
+      ${statCard('Selisih Menggantung', fmt(totalPending), 'unit', 'Sudah potong stok existing', '#b42318')}
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Exception Report</div>
+          <div class="panel-sub">SJ sudah potong stok existing, fisik belum diterima</div></div>
+      </div>
+      <div class="panel-body">
+        ${pending.length ? `<table class="tbl">
+          <thead><tr><th>Surat Jalan</th><th>Pelanggan</th><th>Produk / Kode</th>
+            <th class="num">Qty Menggantung</th><th>Umur</th><th>Alasan</th></tr></thead>
+          <tbody>${exception}</tbody>
+        </table>` : `<div class="empty"><b>Tidak ada selisih</b></div>`}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div><div class="panel-title">Riwayat Mutasi</div>
+          <div class="panel-sub">15 mutasi terakhir dengan batch & SJ referensi</div></div>
+      </div>
+      <div class="panel-body">
+        <table class="tbl">
+          <thead><tr><th>Tanggal</th><th>Tipe</th><th>Referensi</th><th>Batch</th><th>Pelanggan</th>
+            <th>Produk</th><th>Rak</th><th class="num">Qty</th></tr></thead>
+          <tbody>${mutasi || '<tr><td colspan="8" class="empty">Belum ada mutasi.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* =========================================================
+   16. HALAMAN: MASTER DATA
+   ========================================================= */
+function renderMaster(){
+  const tabs = [
+    { id:'produk',    label:'Produk',    count: db.products.length },
+    { id:'pelanggan', label:'Pelanggan', count: db.customers.length },
+    { id:'gudang',    label:'Gudang',    count: db.locations.length },
+    { id:'rak',       label:'Rak',       count: db.racks.length },
+  ];
+  const tabsHtml = tabs.map(t =>
+    `<button class="tab ${ui.masterTab === t.id ? 'active' : ''}" onclick="ui.masterTab='${t.id}';render()">
+      ${t.label}<span class="count">${t.count}</span>
+    </button>`).join('');
+  let bodyHtml = '', addLabel = '', addFn = '';
+  if (ui.masterTab === 'produk') {
+    addLabel = '+ Tambah Produk'; addFn = 'openProduct()';
+    bodyHtml = `<table class="tbl">
+      <thead><tr><th>Kode Produk</th><th>Nama Produk</th><th>Satuan</th><th class="num">Aksi</th></tr></thead>
+      <tbody>${db.products.map(p => `<tr>
+        <td>${kodeTag(p.code)}</td><td>${p.name}</td><td>${p.unit}</td>
+        <td class="num"><div class="btn-group">
+          <button class="btn btn-sm" onclick="openProduct('${p.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="delProduct('${p.id}')">Hapus</button>
+        </div></td></tr>`).join('')}</tbody></table>`;
+  } else if (ui.masterTab === 'pelanggan') {
+    addLabel = '+ Tambah Pelanggan'; addFn = 'openCustomer()';
+    bodyHtml = `<table class="tbl">
+      <thead><tr><th>Kode</th><th>Nama Pelanggan</th><th>Alamat</th><th>Lokasi Titipan</th><th class="num">Aksi</th></tr></thead>
+      <tbody>${db.customers.map(c => {
+        const lc = locOfCustomer(c.id);
+        return `<tr><td>${kodeTag(c.code)}</td><td>${c.name}</td>
+          <td class="sub">${c.address || '—'}</td>
+          <td>${lc ? lc.name : '<span class="sub">— belum ada —</span>'}</td>
+          <td class="num"><div class="btn-group">
+            <button class="btn btn-sm" onclick="openCustomer('${c.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="delCustomer('${c.id}')">Hapus</button>
+          </div></td></tr>`;}).join('')}</tbody></table>`;
+  } else if (ui.masterTab === 'gudang') {
+    addLabel = '+ Tambah Gudang'; addFn = 'openLocation()';
+    bodyHtml = `<table class="tbl">
+      <thead><tr><th>Tipe</th><th>Nama Gudang</th><th>Pelanggan</th><th class="num">Rak</th><th class="num">Aksi</th></tr></thead>
+      <tbody>${db.locations.map(l => {
+        const rc = db.racks.filter(r => r.locationId === l.id).length;
+        return `<tr>
+          <td>${l.type === 'MAIN' ? '<span class="badge b-purple">Utama</span>' : '<span class="badge b-blue">Titipan</span>'}</td>
+          <td>${l.name}</td>
+          <td>${l.customer ? cust(l.customer).name : '<span class="sub">—</span>'}</td>
+          <td class="num">${rc}</td>
+          <td class="num"><div class="btn-group">
+            <button class="btn btn-sm" onclick="openLocation('${l.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="delLocation('${l.id}')">Hapus</button>
+          </div></td></tr>`;}).join('')}</tbody></table>`;
+  } else if (ui.masterTab === 'rak') {
+    addLabel = '+ Tambah Rak'; addFn = 'openRack()';
+    bodyHtml = `<table class="tbl">
+      <thead><tr><th>Kode Rak</th><th>Nama Rak</th><th>Gudang</th><th class="num">Aksi</th></tr></thead>
+      <tbody>${db.racks.map(r => `<tr>
+        <td>${rakTag(r.code)}</td><td>${r.name}</td><td>${loc(r.locationId).name}</td>
+        <td class="num"><div class="btn-group">
+          <button class="btn btn-sm" onclick="openRack('${r.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="delRack('${r.id}')">Hapus</button>
+        </div></td></tr>`).join('')}</tbody></table>`;
+  }
+
+  return `
+    <div class="callout callout-blue">
+      <div>🛠️</div>
+      <div><b>Master Data</b> mengelola seluruh referensi transaksi. Data yang sudah dipakai tidak dapat dihapus.</div>
+    </div>
+    <div class="panel">
+      <div class="tabs">${tabsHtml}</div>
+      <div class="panel-head">
+        <div class="panel-title">Daftar ${tabs.find(t => t.id === ui.masterTab).label}</div>
+        <div class="panel-actions">
+          <button class="btn btn-primary" onclick="${addFn}">${addLabel}</button>
+        </div>
+      </div>
+      <div class="panel-body">${bodyHtml}</div>
+    </div>`;
+}
+
+/* =========================================================
+   17. MODAL CORE
+   ========================================================= */
+function openModal({ title, sub, body, footer }){
+  $('modalRoot').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-head">
+          <div><h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>
+          <button class="x" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">${body}</div>
+        <div class="modal-foot">${footer}</div>
+      </div>
+    </div>`;
+}
+function closeModal(){ $('modalRoot').innerHTML = ''; }
+function findLine(sjNo, lineId){
+  const s = db.sj.find(x => x.no === sjNo);
+  const l = s && s.lines.find(x => x.id === lineId);
+  return { s, l };
+}
+
+/* =========================================================
+   18. MODAL: TAMBAH SJ BARU
+   ========================================================= */
+function openAddSJ(){
+  _sjDraft = {
+    no: nextSJNumber(), date: TODAY,
+    customer: db.customers[0]?.id || '',
+    po: '', lines: [{ product: db.products[0]?.id || '', qty: 1 }]
+  };
+  updateAddSJModal();
+}
+function syncSJDraftFromDOM(){
+  if ($('asNo'))       _sjDraft.no       = $('asNo').value;
+  if ($('asDate'))     _sjDraft.date     = $('asDate').value;
+  if ($('asCustomer')) _sjDraft.customer = $('asCustomer').value;
+  if ($('asPo'))       _sjDraft.po       = $('asPo').value;
+}
+function updateAddSJModal(){
+  const d = _sjDraft;
+  const lineRows = d.lines.map((ln, i) => {
+    const p = prod(ln.product);
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td>
+        <select class="inline-input" onchange="updateSJLine(${i}, 'product', this.value)">
+          ${db.products.map(pr => `<option value="${pr.id}" ${ln.product===pr.id?'selected':''}>${pr.code} — ${pr.name}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" min="1" value="${ln.qty}" class="inline-input" style="width:100px"
+               onchange="updateSJLine(${i}, 'qty', parseInt(this.value,10))"></td>
+      <td class="sub">${p.unit}</td>
+      <td class="num"><button class="btn btn-sm btn-danger" onclick="removeSJLine(${i})" ${d.lines.length===1?'disabled':''}>×</button></td>
+    </tr>`;
+  }).join('');
+  openModal({
+    title: 'Tambah Penerimaan SJ',
+    sub: 'Dokumen masuk administratif — batch akan dibuat saat Fisik Ada dikonfirmasi',
+    body: `
+      <div class="grid2">
+        <div class="field"><label>No SJ</label>
+          <input id="asNo" type="text" value="${d.no}" required></div>
+        <div class="field"><label>Tanggal</label>
+          <input id="asDate" type="date" value="${d.date}" required></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Pelanggan</label>
+          <select id="asCustomer">
+            ${db.customers.map(c => `<option value="${c.id}" ${d.customer===c.id?'selected':''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>No PO</label>
+          <input id="asPo" type="text" value="${d.po}" placeholder="PO-XXXX"></div>
+      </div>
+      <div class="addline-box">
+        <div class="addline-title">Baris Produk</div>
+        <table class="tbl" style="margin-bottom:10px">
+          <thead><tr>
+            <th class="num" style="width:30px">#</th><th>Produk</th>
+            <th style="width:120px">Qty</th><th style="width:50px">Satuan</th><th></th>
+          </tr></thead>
+          <tbody>${lineRows}</tbody>
+        </table>
+        <button class="btn" onclick="addSJLine()">+ Tambah Baris</button>
+      </div>
+      <div class="hint">Setelah SJ dibuat, lakukan <b>Fisik Ada</b> pada halaman Penerimaan untuk membuat batch dengan nomor batch.</div>
+    `,
+    footer: `
+      <button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="submitAddSJ()">Simpan Surat Jalan</button>
+    `
+  });
+}
+function updateSJLine(i, field, value){
+  syncSJDraftFromDOM(); _sjDraft.lines[i][field] = value; updateAddSJModal();
+}
+function addSJLine(){
+  syncSJDraftFromDOM(); _sjDraft.lines.push({ product: db.products[0]?.id || '', qty: 1 }); updateAddSJModal();
+}
+function removeSJLine(i){
+  syncSJDraftFromDOM();
+  if (_sjDraft.lines.length === 1) return;
+  _sjDraft.lines.splice(i, 1); updateAddSJModal();
+}
+function submitAddSJ(){
+  syncSJDraftFromDOM();
+  const d = _sjDraft;
+  if (!d.no.trim()) { toast('No SJ wajib diisi.', 'err'); return; }
+  if (db.sj.find(s => s.no === d.no.trim())) { toast('No SJ sudah dipakai.', 'err'); return; }
+  if (!d.date) { toast('Tanggal wajib.', 'err'); return; }
+  if (!d.customer) { toast('Pilih pelanggan.', 'err'); return; }
+  if (!d.po.trim()) { toast('No PO wajib diisi.', 'err'); return; }
+  if (!d.lines.length) { toast('Minimal 1 baris produk.', 'err'); return; }
+  if (d.lines.some(l => !l.product || !l.qty || l.qty < 1)) { toast('Setiap baris harus punya produk dan qty valid.', 'err'); return; }
+  const lines = d.lines.map((ln, i) => ({
+    id: `new${Date.now()}-${i}`, product: ln.product, qtySj: ln.qty,
+    qtyCancelled: 0, decision: 'OPEN', receipts: []
+  }));
+  db.sj.unshift({ no: d.no.trim(), date: d.date, customer: d.customer, po: d.po.trim(), lines });
+  toast(`Surat Jalan ${d.no.trim()} ditambahkan. Lakukan Fisik Ada untuk membuat batch.`, 'ok');
+  closeModal(); render();
+}
+
+/* =========================================================
+   19. MODAL: FISIK ADA
+   ========================================================= */
+function openReceive(sjNo, lineId){
+  const { s, l } = findLine(sjNo, lineId);
+  if (!s || !l) return;
+  const p = prod(l.product);
+  const pending = pendingOf(l);
+  const racks = racksOfCustomer(s.customer);
+  if (!racks.length) { toast('Pelanggan ini belum punya rak titipan. Tambahkan di Master Data.', 'err'); return; }
+  const defaultBatch = suggestBatchNumber(TODAY);
+  openModal({
+    title: 'Konfirmasi Penerimaan Fisik',
+    sub: 'Akan membuat batch dengan nomor batch yang terikat ke SJ ini',
+    body: `
+      <div class="infobox">
+        <div><span class="k">Surat Jalan</span><b>${s.no}</b></div>
+        <div><span class="k">Pelanggan</span><b>${cust(s.customer).name}</b></div>
+        <div><span class="k">Produk</span><b>${p.name}</b></div>
+        <div><span class="k">Kode Produk</span><b>${p.code}</b></div>
+        <div><span class="k">Qty Pending</span><b style="color:#b45309">${fmt(pending)} ${p.unit}</b></div>
+        <div><span class="k">Stok titipan</span><b>+${fmt(pending)} saat konfirmasi</b></div>
+      </div>
+      <form onsubmit="return submitReceive(event,'${s.no}','${l.id}')">
+        <div class="grid2">
+          <div class="field">
+            <label>Qty diterima fisik</label>
+            <input id="rcvQty" type="number" min="1" max="${pending}" value="${pending}" required>
+            <div class="hint">Maks ${fmt(pending)} ${p.unit}. Boleh kurang untuk bertahap (batch berbeda).</div>
+          </div>
+          <div class="field">
+            <label>Tanggal fisik</label>
+            <input id="rcvDate" type="date" value="${TODAY}" required onchange="refreshBatchSuggestion()">
+          </div>
+        </div>
+        <div class="field">
+          <label>No. Batch</label>
+          <input id="rcvBatch" type="text" value="${defaultBatch}" required>
+          <div class="hint">Nomor batch/lot barang. Akan tampil di stok, kartu stock, pengiriman, dan surat jalan.</div>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label>Lokasi rak tujuan</label>
+            <select id="rcvRack" required>
+              ${racks.map(r => `<option value="${r.id}">${r.code} — ${r.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Kondisi</label>
+            <select id="rcvCond"><option>Baik</option><option>Rusak sebagian</option></select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Petugas penerima</label>
+          <input id="rcvPic" type="text" value="Admin Gudang" required>
+        </div>
+      </form>`,
+    footer: `
+      <button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-ok" onclick="submitReceive(null,'${s.no}','${l.id}')">Konfirmasi Fisik Ada</button>`
+  });
+}
+function refreshBatchSuggestion(){
+  const date = $('rcvDate').value || TODAY;
+  $('rcvBatch').value = suggestBatchNumber(date);
+}
+function submitReceive(ev, sjNo, lineId){
+  if (ev) ev.preventDefault();
+  const { s, l } = findLine(sjNo, lineId);
+  const pending = pendingOf(l);
+  const qty = parseInt($('rcvQty').value, 10);
+  if (!qty || qty < 1 || qty > pending) { toast('Qty tidak valid.', 'err'); return false; }
+  const date = $('rcvDate').value || TODAY;
+  const rackId = $('rcvRack').value;
+  const batchNumber = $('rcvBatch').value.trim();
+  if (!batchNumber) { toast('No. Batch wajib diisi.', 'err'); return false; }
+  l.receipts = l.receipts || [];
+  l.receipts.push({ qty, rackId, date, pic: $('rcvPic').value, batchNumber });
+  if (pendingOf(l) === 0) l.decision = 'DONE';
+  movements.unshift({
+    date, type:'CONSIGN_IN', ref: s.no, product: l.product,
+    customer: s.customer, rackId, qty, batchNumber,
+    note:'Penerimaan fisik', sjRef: s.no
+  });
+  toast(`Batch ${batchNumber} dari ${s.no}: ${fmt(qty)} ${prod(l.product).unit} di ${rack(rackId).code}.`, 'ok');
+  closeModal(); render(); return false;
+}
+
+/* =========================================================
+   20. MODAL: FISIK BELUM ADA & BATALKAN
+   ========================================================= */
+function openWait(sjNo, lineId){
+  const { s, l } = findLine(sjNo, lineId);
+  if (!s || !l) return;
+  const p = prod(l.product);
+  openModal({
+    title: 'Tandai Fisik Belum Ada',
+    sub: 'Baris masuk dashboard pending — stok tidak berubah',
+    body: `
+      <div class="infobox">
+        <div><span class="k">Surat Jalan</span><b>${s.no}</b></div>
+        <div><span class="k">Pelanggan</span><b>${cust(s.customer).name}</b></div>
+        <div><span class="k">Produk</span><b>${p.name}</b></div>
+        <div><span class="k">Kode Produk</span><b>${p.code}</b></div>
+        <div><span class="k">Qty Pending</span><b style="color:#b45309">${fmt(pendingOf(l))}</b></div>
+        <div><span class="k">Stok titipan</span><b>Tidak berubah</b></div>
+      </div>
+      <form onsubmit="return submitWait(event,'${s.no}','${l.id}')">
+        <div class="field"><label>Alasan belum ada</label>
+          <select id="wtAlasan">
+            ${Object.keys(ALASAN).map(k => `<option value="${k}">${ALASAN[k]}</option>`).join('')}
+          </select></div>
+        <div class="grid2">
+          <div class="field"><label>Estimasi ready</label>
+            <input id="wtEta" type="date" value="${l.eta || TODAY}"></div>
+          <div class="field"><label>PIC</label>
+            <input id="wtPic" type="text" value="${l.pic || ''}" required></div>
+        </div>
+      </form>`,
+    footer: `
+      <button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-warn" onclick="submitWait(null,'${s.no}','${l.id}')">Simpan ke Pending</button>`
+  });
+}
+function submitWait(ev, sjNo, lineId){
+  if (ev) ev.preventDefault();
+  const { s, l } = findLine(sjNo, lineId);
+  l.decision = 'WAITING'; l.alasan = $('wtAlasan').value;
+  l.eta = $('wtEta').value; l.pic = $('wtPic').value;
+  toast(`${s.no} dipindahkan ke pending.`, 'warn');
+  closeModal(); render(); return false;
+}
+function openCancel(sjNo, lineId){
+  const { s, l } = findLine(sjNo, lineId);
+  if (!s || !l) return;
+  const pending = pendingOf(l);
+  openModal({
+    title: 'Batalkan Sisa Pending',
+    sub: 'Hanya untuk barang yang dipastikan tidak akan datang',
+    body: `
+      <div class="callout callout-amber" style="margin-bottom:16px">
+        <div>⚠️</div>
+        <div>Membatalkan <b>${fmt(pending)} ${prod(l.product).unit}</b> dari <b>${s.no}</b>. Selisih ini wajib dicatat di rekonsiliasi.</div>
+      </div>
+      <form onsubmit="return submitCancel(event,'${s.no}','${l.id}')">
+        <div class="field"><label>Alasan</label>
+          <select id="cnReason">
+            <option value="BATAL_PELANGGAN">Dibatalkan pelanggan</option>
+            <option value="BARANG_TIDAK_DATANG">Barang tidak akan datang</option>
+            <option value="SALAH_INPUT">Salah input surat jalan</option>
+            <option value="LAINNYA">Lainnya</option>
+          </select></div>
+        <div class="field"><label>Catatan</label>
+          <textarea id="cnNote" placeholder="Keterangan…"></textarea></div>
+      </form>`,
+    footer: `
+      <button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-danger" onclick="submitCancel(null,'${s.no}','${l.id}')">Ya, Batalkan</button>`
+  });
+}
+function submitCancel(ev, sjNo, lineId){
+  if (ev) ev.preventDefault();
+  const { s, l } = findLine(sjNo, lineId);
+  const pending = pendingOf(l);
+  l.qtyCancelled += pending; l.decision = 'DONE';
+  toast(`${fmt(pending)} unit dari ${s.no} dibatalkan.`, 'warn');
+  closeModal(); render(); return false;
+}
+
+/* =========================================================
+   21. MODAL: BUAT PENGIRIMAN
+   ========================================================= */
+function openShipment(){
+  _shipDraft = { customer: db.customers[0]?.id || '', date: TODAY, driver:'', vehicle:'', note:'', lines:[] };
+  updateShipModal();
+}
+function syncShipDraftFromDOM(){
+  if ($('shDate'))    _shipDraft.date    = $('shDate').value || _shipDraft.date;
+  if ($('shDriver'))  _shipDraft.driver  = $('shDriver').value;
+  if ($('shVehicle')) _shipDraft.vehicle = $('shVehicle').value;
+  if ($('shNote'))    _shipDraft.note    = $('shNote').value;
+}
+function updateShipModal(){
+  const d = _shipDraft;
+  const batches = getAvailableBatchesForCustomer(d.customer);
+  const usedQty = {};
+  d.lines.forEach(ln => { usedQty[ln.batchId] = (usedQty[ln.batchId] || 0) + ln.qty; });
+  const availableBatches = batches.filter(b => (b.qtyAvail - (usedQty[b.id] || 0)) > 0);
+  const batchOpts = availableBatches.length ? availableBatches.map(b => {
+    const avail = b.qtyAvail - (usedQty[b.id] || 0);
+    const p = prod(b.product);
+    return `<option value="${b.id}">${b.batchNumber} • ${b.sjNo} • ${p.code} ${p.name} @ ${rack(b.rackId).code} — sisa ${fmt(avail)} ${p.unit}</option>`;
+  }).join('') : '<option value="">— tidak ada stok tersedia —</option>';
+  const lineRows = d.lines.length ? d.lines.map((ln, i) => {
+    const p = prod(ln.product);
+    return `<tr>
+      <td class="num">${i+1}</td>
+      <td>${batchTag(ln.batchNumber)}</td>
+      <td>${sjTag(ln.sjNo)}</td>
+      <td>${p.name}<div class="sub">${kodeTag(p.code)}</div></td>
+      <td>${rakTag(rack(ln.rackId).code)}</td>
+      <td class="num"><b>${fmt(ln.qty)}</b> <span class="sub">${p.unit}</span></td>
+      <td class="num"><button class="btn btn-sm btn-danger" onclick="removeShipLine(${i})">×</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty" style="padding:24px">Belum ada baris. Pilih batch di atas lalu tambahkan.</td></tr>';
+  const totalQty = d.lines.reduce((a,l) => a + l.qty, 0);
+  const canAdd = availableBatches.length > 0;
+  openModal({
+    title: 'Buat Pengiriman dari Gudang Titipan',
+    sub: 'Pilih batch spesifik (dengan nomor batch) yang akan dikirim',
+    body: `
+      <div class="grid2">
+        <div class="field">
+          <label>Pelanggan</label>
+          <select id="shCustomer" onchange="onShipCustomerChange()">
+            ${db.customers.map(c => `<option value="${c.id}" ${d.customer===c.id?'selected':''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>Tanggal kirim</label>
+          <input id="shDate" type="date" value="${d.date}"></div>
+      </div>
+      <div class="addline-box">
+        <div class="addline-title">Tambah Baris Pengiriman</div>
+        <div class="field">
+          <label>Batch stok (No. Batch × SJ × Produk × Rak)</label>
+          <select id="shBatchSel" ${canAdd?'':'disabled'}>${batchOpts}</select>
+        </div>
+        <div class="grid2">
+          <div class="field" style="margin-bottom:0"><label>Qty kirim</label>
+            <input id="shBatchQty" type="number" min="1" value="1" ${canAdd?'':'disabled'}></div>
+          <div class="field" style="margin-bottom:0"><label>&nbsp;</label>
+            <button class="btn btn-primary" style="width:100%" onclick="addShipLine()" ${canAdd?'':'disabled'}>+ Tambah Baris</button></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-bottom:16px">
+        <table class="tbl">
+          <thead><tr><th class="num">#</th><th>No. Batch</th><th>Dari SJ</th><th>Produk</th><th>Rak</th>
+            <th class="num">Qty</th><th></th></tr></thead>
+          <tbody>${lineRows}</tbody>
+          ${d.lines.length ? `<tfoot><tr>
+            <td colspan="5" style="text-align:right;font-weight:700;padding:10px 14px;border-top:2px solid #e5e7f0">Total</td>
+            <td class="num" style="font-weight:700;padding:10px 14px;border-top:2px solid #e5e7f0">${fmt(totalQty)}</td>
+            <td style="border-top:2px solid #e5e7f0"></td>
+          </tr></tfoot>` : ''}
+        </table>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Nama sopir</label>
+          <input id="shDriver" type="text" value="${d.driver}" placeholder="Nama sopir"></div>
+        <div class="field"><label>Nomor kendaraan</label>
+          <input id="shVehicle" type="text" value="${d.vehicle}" placeholder="B 1234 ABC"></div>
+      </div>
+      <div class="field"><label>Catatan (opsional)</label>
+        <textarea id="shNote" placeholder="Instruksi pengiriman…">${d.note}</textarea></div>
+    `,
+    footer: `
+      <button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn" onclick="submitShipment(false)" ${d.lines.length?'':'disabled'}>Simpan</button>
+      <button class="btn btn-primary" onclick="submitShipment(true)" ${d.lines.length?'':'disabled'}>Simpan &amp; Cetak SJ</button>
+    `
+  });
+}
+function onShipCustomerChange(){
+  const newCid = $('shCustomer').value;
+  if (_shipDraft.customer !== newCid && _shipDraft.lines.length > 0) {
+    if (!confirm('Ganti pelanggan akan menghapus baris yang sudah dipilih. Lanjutkan?')) {
+      $('shCustomer').value = _shipDraft.customer;
+      return;
+    }
+    _shipDraft.lines = [];
+  }
+  _shipDraft.customer = newCid; updateShipModal();
+}
+function addShipLine(){
+  syncShipDraftFromDOM();
+  const batchId = $('shBatchSel').value;
+  const qty = parseInt($('shBatchQty').value, 10);
+  if (!batchId) { toast('Pilih batch terlebih dahulu.', 'err'); return; }
+  if (!qty || qty < 1) { toast('Qty minimal 1.', 'err'); return; }
+  const b = getAvailableBatchesForCustomer(_shipDraft.customer).find(x => x.id === batchId);
+  if (!b) { toast('Batch tidak ditemukan.', 'err'); return; }
+  const used = _shipDraft.lines.filter(l => l.batchId === batchId).reduce((a,l) => a + l.qty, 0);
+  if (used + qty > b.qtyAvail) { toast(`Qty melebihi stok tersedia (sisa ${fmt(b.qtyAvail - used)}).`, 'err'); return; }
+  _shipDraft.lines.push({ batchId, sjNo: b.sjNo, batchNumber: b.batchNumber, product: b.product, rackId: b.rackId, qty });
+  updateShipModal();
+}
+function removeShipLine(i){ syncShipDraftFromDOM(); _shipDraft.lines.splice(i, 1); updateShipModal(); }
+function submitShipment(andPrint){
+  syncShipDraftFromDOM();
+  const d = _shipDraft;
+  if (!d.lines.length) { toast('Belum ada baris pengiriman.', 'err'); return; }
+  const seq = String(db.shipments.length + 1).padStart(3, '0');
+  const no = 'DO-TTR-' + seq;
+  const lines = d.lines.map(ln => ({
+    product: ln.product, qty: ln.qty, rackId: ln.rackId,
+    consumed: [{ batchId: ln.batchId, sjNo: ln.sjNo, batchNumber: ln.batchNumber, qty: ln.qty }]
+  }));
+  db.shipments.push({
+    no, date: d.date, customer: d.customer, status: 'SHIPPED', pod: null,
+    driver: d.driver, vehicle: d.vehicle, note: d.note, printCount: 0, lastPrintedAt: null, lines
+  });
+  d.lines.forEach(ln => movements.unshift({
+    date: d.date, type:'CONSIGN_OUT', ref: no, product: ln.product,
+    customer: d.customer, rackId: ln.rackId, qty: -ln.qty,
+    batchNumber: ln.batchNumber, note: 'Pengiriman', sjRef: ln.sjNo
+  }));
+  toast(`Pengiriman ${no} dibuat: ${d.lines.length} baris, ${fmt(d.lines.reduce((a,l) => a+l.qty,0))} unit.`, 'ok');
+  closeModal(); render();
+  if (andPrint) setTimeout(() => printSuratJalan(no), 250);
+}
+
+/* =========================================================
+   22. CETAK SURAT JALAN
+   ========================================================= */
+function printSuratJalan(no){
+  const sh = db.shipments.find(s => s.no === no);
+  if (!sh) { toast('Pengiriman tidak ditemukan.', 'err'); return; }
+  const c = cust(sh.customer);
+  const totalQty = sh.lines.reduce((a,l) => a + l.qty, 0);
+  const rows = sh.lines.map((l, i) => {
+    const p = prod(l.product);
+    const r = rack(l.rackId);
+    const sjRefs = (l.consumed || []).map(c => c.sjNo).filter(Boolean).join(', ') || '—';
+    const batchRefs = (l.consumed || []).map(c => c.batchNumber).filter(Boolean).join(', ') || '—';
+    return `<tr>
+      <td class="center">${i+1}</td>
+      <td class="center mono">${p.code}</td>
+      <td>${p.name}</td>
+      <td class="center mono batch-ref">${batchRefs}</td>
+      <td class="center mono">${r.code}</td>
+      <td class="center mono sj-ref">${sjRefs}</td>
+      <td class="center">${fmt(l.qty)}</td>
+      <td class="center">${p.unit}</td>
+    </tr>`;
+  }).join('');
+  const totalUnit = new Set(sh.lines.map(l => prod(l.product).unit)).size === 1
+    ? prod(sh.lines[0].product).unit : 'unit';
+
+  const html = `<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"><title>Surat Jalan ${sh.no}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 10.5pt; line-height: 1.4; background: #fff; }
+  .toolbar { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 100; }
+  .toolbar button { padding: 9px 18px; border-radius: 8px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 11pt; font-family: inherit; }
+  .toolbar button.primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+  .doc { max-width: 190mm; margin: 0 auto; padding: 6mm 0; }
+  .header { display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 3px double #000; margin-bottom: 18px; }
+  .logo { width: 58px; height: 58px; border-radius: 10px; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22pt; flex-shrink: 0; }
+  .company h1 { font-size: 15pt; font-weight: bold; margin-bottom: 2px; }
+  .company p { font-size: 9pt; color: #444; margin: 1px 0; }
+  .company .npwp { color: #666; font-size: 8.5pt; margin-top: 2px; }
+  .title { text-align: center; margin: 20px 0 4px; }
+  .title h2 { font-size: 16pt; font-weight: bold; letter-spacing: 4px; }
+  .sj-no { text-align: center; font-size: 11pt; margin-bottom: 20px; }
+  .sj-no b { font-family: 'Courier New', monospace; }
+  .info-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 18px; }
+  .info-box { border: 1px solid #333; padding: 10px 12px; }
+  .info-box h3 { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px; color: #666; padding-bottom: 6px; border-bottom: 1px solid #ddd; margin-bottom: 8px; }
+  .info-box p { font-size: 10pt; margin: 3px 0; }
+  .info-box .name { font-weight: bold; font-size: 11pt; }
+  .info-box .addr { font-size: 9pt; color: #333; }
+  .info-box .kv { display: flex; gap: 6px; margin: 3px 0; font-size: 9.5pt; }
+  .info-box .kv .k { color: #666; min-width: 90px; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  table.items th { background: #f0f0f0; padding: 8px 5px; font-size: 8pt; text-transform: uppercase; letter-spacing: .3px; border: 1px solid #333; text-align: left; }
+  table.items td { padding: 6px 5px; border: 1px solid #999; font-size: 9pt; vertical-align: top; }
+  table.items .center { text-align: center; }
+  table.items .mono { font-family: 'Courier New', monospace; }
+  table.items .batch-ref { font-weight: bold; color: #166534; }
+  table.items .sj-ref { font-size: 8pt; color: #555; }
+  table.items tr.total-row td { background: #f7f7f7; font-weight: bold; border-top: 2px solid #000; }
+  .note { padding: 10px 12px; background: #f8f9ff; border-left: 3px solid #4f46e5; margin-bottom: 22px; font-size: 9.5pt; }
+  .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; page-break-inside: avoid; }
+  .sig { text-align: center; font-size: 10pt; }
+  .sig .role { font-weight: bold; font-size: 9.5pt; margin-bottom: 60px; color: #333; }
+  .sig .line { border-top: 1px solid #000; padding-top: 6px; font-size: 9.5pt; }
+  .sig .name { font-size: 9pt; color: #555; margin-top: 2px; }
+  .footer { margin-top: 26px; padding-top: 8px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 8pt; color: #888; }
+  .footer .doc-code { font-family: 'Courier New', monospace; }
+  @media print { .toolbar { display: none !important; } .doc { padding: 0; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style></head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.close()">Tutup</button>
+    <button class="primary" onclick="window.print()">🖨 Cetak Sekarang</button>
+  </div>
+  <div class="doc">
+    <div class="header">
+      <div class="logo">${company.logo}</div>
+      <div class="company">
+        <h1>${company.name}</h1>
+        <p>${company.address}</p>
+        <p>Telp: ${company.phone} &nbsp;|&nbsp; Email: ${company.email}</p>
+        <p class="npwp">NPWP: ${company.npwp}</p>
+      </div>
+    </div>
+    <div class="title"><h2>SURAT JALAN</h2></div>
+    <div class="sj-no">No: <b>${sh.no}</b></div>
+    <div class="info-grid">
+      <div class="info-box">
+        <h3>Kepada</h3>
+        <p class="name">${c.name}</p>
+        <p class="addr">${c.address || '—'}</p>
+        ${c.phone ? `<p class="addr">Telp: ${c.phone}</p>` : ''}
+      </div>
+      <div class="info-box">
+        <h3>Informasi Pengiriman</h3>
+        <div class="kv"><span class="k">Tanggal</span><span>: ${fmtDate(sh.date)}</span></div>
+        <div class="kv"><span class="k">No. DO</span><span>: ${sh.no}</span></div>
+        ${sh.driver ? `<div class="kv"><span class="k">Sopir</span><span>: ${sh.driver}</span></div>` : ''}
+        ${sh.vehicle ? `<div class="kv"><span class="k">Kendaraan</span><span>: ${sh.vehicle}</span></div>` : ''}
+        <div class="kv"><span class="k">Sumber</span><span>: Gudang Titipan</span></div>
+      </div>
+    </div>
+    <table class="items">
+      <thead><tr>
+        <th style="width:26px" class="center">No</th>
+        <th style="width:72px">Kode Produk</th>
+        <th>Nama Barang</th>
+        <th style="width:110px" class="center">No. Batch</th>
+        <th style="width:60px" class="center">Rak</th>
+        <th style="width:120px" class="center">SJ Asal</th>
+        <th style="width:44px" class="center">Qty</th>
+        <th style="width:44px" class="center">Sat.</th>
+      </tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="total-row">
+          <td colspan="6" style="text-align:right">Total</td>
+          <td class="center">${fmt(totalQty)}</td>
+          <td class="center">${totalUnit}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <b>Catatan:</b> Barang merupakan <b>barang titipan</b> dari gudang titipan <b>${c.name}</b>.
+      Setiap baris mencantumkan <b>No. Batch</b> dan <b>Nomor SJ asal</b> untuk keperluan penelusuran (traceability).
+      ${sh.note ? `<br>${sh.note}` : ''}
+      ${sh.pod ? `<br><b>Diterima pada:</b> ${fmtDate(sh.pod)}` : ''}
+    </div>
+    <div class="signatures">
+      <div class="sig">
+        <div class="role">Pengirim</div>
+        <div class="line">Admin Gudang</div>
+        <div class="name">Tanggal: ______________</div>
+      </div>
+      <div class="sig">
+        <div class="role">Sopir</div>
+        <div class="line">${sh.driver || 'Nama &amp; Tanda Tangan'}</div>
+        <div class="name">${sh.vehicle || 'No. Polisi: __________'}</div>
+      </div>
+      <div class="sig">
+        <div class="role">Penerima</div>
+        <div class="line">Nama &amp; Tanda Tangan</div>
+        <div class="name">Tanggal: ______________</div>
+      </div>
+    </div>
+    <div class="footer">
+      <div>Dokumen ini dicetak dari Sistem Gudang Titipan</div>
+      <div class="doc-code">${sh.no} • Dicetak: ${nowStamp()}</div>
+    </div>
+  </div>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=980,height=760');
+  if (!win) { toast('Popup diblokir. Izinkan popup untuk cetak SJ.', 'err'); return; }
+  win.document.open(); win.document.write(html); win.document.close();
+  sh.printCount = (sh.printCount || 0) + 1;
+  sh.lastPrintedAt = nowStamp();
+  toast(`Surat Jalan ${sh.no} siap dicetak.`, 'ok');
+  render();
+}
+
+/* =========================================================
+   23. MASTER DATA CRUD
+   ========================================================= */
+function openProduct(id){
+  const p = id ? db.products.find(x => x.id === id) : { code:'', name:'', unit:'pcs' };
+  openModal({
+    title: id ? 'Edit Produk' : 'Tambah Produk',
+    sub: 'Kode produk dipakai sebagai identitas utama',
+    body: `<form onsubmit="return saveProduct(event,'${id || ''}')">
+      <div class="field"><label>Kode Produk</label>
+        <input id="mpCode" type="text" value="${p.code}" placeholder="PRD-006" required></div>
+      <div class="field"><label>Nama Produk</label>
+        <input id="mpName" type="text" value="${p.name}" required></div>
+      <div class="field"><label>Satuan</label>
+        <select id="mpUnit">${['pcs','rim','pak','box','lusin','unit','kg','liter']
+          .map(u => `<option value="${u}" ${p.unit===u?'selected':''}>${u}</option>`).join('')}</select></div>
+    </form>`,
+    footer: `<button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveProduct(null,'${id || ''}')">Simpan</button>`
+  });
+}
+function saveProduct(ev, id){
+  if (ev) ev.preventDefault();
+  const code = $('mpCode').value.trim(), name = $('mpName').value.trim(), unit = $('mpUnit').value;
+  if (!code || !name) { toast('Kode & nama wajib.', 'err'); return false; }
+  if (db.products.find(p => p.code === code && p.id !== id)) { toast('Kode sudah dipakai.', 'err'); return false; }
+  if (id) { Object.assign(db.products.find(p => p.id === id), { code, name, unit }); toast('Produk diperbarui.', 'ok'); }
+  else { db.products.push({ id:'P' + (db.products.length + 1 + Date.now() % 1000), code, name, unit }); toast('Produk ditambahkan.', 'ok'); }
+  closeModal(); render(); return false;
+}
+function delProduct(id){
+  if (db.sj.some(s => s.lines.some(l => l.product === id))) { toast('Produk dipakai di SJ.', 'err'); return; }
+  if (db.shipments.some(sh => sh.lines.some(l => l.product === id))) { toast('Produk dipakai di pengiriman.', 'err'); return; }
+  if (!confirm('Hapus produk?')) return;
+  db.products = db.products.filter(p => p.id !== id); toast('Produk dihapus.', 'warn'); render();
+}
+function openCustomer(id){
+  const c = id ? db.customers.find(x => x.id === id) : { code:'', name:'', address:'', phone:'' };
+  openModal({
+    title: id ? 'Edit Pelanggan' : 'Tambah Pelanggan',
+    body: `<form onsubmit="return saveCustomer(event,'${id || ''}')">
+      <div class="grid2">
+        <div class="field"><label>Kode</label><input id="mcCode" type="text" value="${c.code}" required></div>
+        <div class="field"><label>Telepon</label><input id="mcPhone" type="text" value="${c.phone || ''}"></div>
+      </div>
+      <div class="field"><label>Nama</label><input id="mcName" type="text" value="${c.name}" required></div>
+      <div class="field"><label>Alamat</label><textarea id="mcAddress">${c.address || ''}</textarea></div>
+    </form>`,
+    footer: `<button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveCustomer(null,'${id || ''}')">Simpan</button>`
+  });
+}
+function saveCustomer(ev, id){
+  if (ev) ev.preventDefault();
+  const code = $('mcCode').value.trim().toUpperCase(), name = $('mcName').value.trim();
+  const address = $('mcAddress').value.trim(), phone = $('mcPhone').value.trim();
+  if (!code || !name) { toast('Kode & nama wajib.', 'err'); return false; }
+  if (db.customers.find(c => c.code === code && c.id !== id)) { toast('Kode sudah dipakai.', 'err'); return false; }
+  if (id) { Object.assign(db.customers.find(c => c.id === id), { code, name, address, phone }); toast('Pelanggan diperbarui.', 'ok'); }
+  else { db.customers.push({ id:'C' + (db.customers.length + 1 + Date.now() % 1000), code, name, address, phone }); toast('Pelanggan ditambahkan.', 'ok'); }
+  closeModal(); render(); return false;
+}
+function delCustomer(id){
+  if (db.sj.some(s => s.customer === id)) { toast('Dipakai di SJ.', 'err'); return; }
+  if (db.shipments.some(sh => sh.customer === id)) { toast('Dipakai di pengiriman.', 'err'); return; }
+  if (db.locations.some(l => l.customer === id)) { toast('Masih punya gudang titipan.', 'err'); return; }
+  if (!confirm('Hapus pelanggan?')) return;
+  db.customers = db.customers.filter(c => c.id !== id); toast('Pelanggan dihapus.', 'warn'); render();
+}
+function openLocation(id){
+  const l = id ? db.locations.find(x => x.id === id) : { type:'CONSIGN', name:'', customer:'' };
+  openModal({
+    title: id ? 'Edit Gudang' : 'Tambah Gudang',
+    body: `<form onsubmit="return saveLocation(event,'${id || ''}')">
+      <div class="field"><label>Tipe</label>
+        <select id="mlType" onchange="toggleLocCust()">
+          <option value="MAIN" ${l.type==='MAIN'?'selected':''}>Gudang Utama</option>
+          <option value="CONSIGN" ${l.type==='CONSIGN'?'selected':''}>Gudang Titipan</option>
+        </select></div>
+      <div class="field"><label>Nama</label><input id="mlName" type="text" value="${l.name}" required></div>
+      <div class="field" id="mlCustWrap"><label>Pelanggan</label>
+        <select id="mlCust"><option value="">—</option>
+          ${db.customers.map(c => `<option value="${c.id}" ${l.customer===c.id?'selected':''}>${c.name}</option>`).join('')}
+        </select></div>
+    </form>`,
+    footer: `<button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveLocation(null,'${id || ''}')">Simpan</button>`
+  });
+  toggleLocCust();
+}
+function toggleLocCust(){ $('mlCustWrap').style.display = $('mlType').value === 'CONSIGN' ? '' : 'none'; }
+function saveLocation(ev, id){
+  if (ev) ev.preventDefault();
+  const type = $('mlType').value, name = $('mlName').value.trim();
+  const customer = type === 'CONSIGN' ? $('mlCust').value : null;
+  if (!name) { toast('Nama wajib.', 'err'); return false; }
+  if (type === 'CONSIGN' && !customer) { toast('Pilih pelanggan.', 'err'); return false; }
+  if (customer && db.locations.find(l => l.customer === customer && l.id !== id)) { toast('Pelanggan sudah punya gudang titipan.', 'err'); return false; }
+  if (id) { Object.assign(db.locations.find(l => l.id === id), { type, name, customer }); toast('Gudang diperbarui.', 'ok'); }
+  else { db.locations.push({ id:'L' + (db.locations.length + 1 + Date.now() % 1000), type, name, customer }); toast('Gudang ditambahkan.', 'ok'); }
+  closeModal(); render(); return false;
+}
+function delLocation(id){
+  if (db.racks.some(r => r.locationId === id)) { toast('Masih punya rak.', 'err'); return; }
+  if (!confirm('Hapus gudang?')) return;
+  db.locations = db.locations.filter(l => l.id !== id); toast('Gudang dihapus.', 'warn'); render();
+}
+function openRack(id){
+  const r = id ? db.racks.find(x => x.id === id) : { code:'', name:'', locationId: db.locations[0]?.id || '' };
+  openModal({
+    title: id ? 'Edit Rak' : 'Tambah Rak',
+    body: `<form onsubmit="return saveRack(event,'${id || ''}')">
+      <div class="field"><label>Gudang</label>
+        <select id="mrLoc">${db.locations.map(l => `<option value="${l.id}" ${r.locationId===l.id?'selected':''}>${l.name}</option>`).join('')}</select></div>
+      <div class="grid2">
+        <div class="field"><label>Kode Rak</label><input id="mrCode" type="text" value="${r.code}" placeholder="A-01-01" required></div>
+        <div class="field"><label>Nama Rak</label><input id="mrName" type="text" value="${r.name}" required></div>
+      </div>
+    </form>`,
+    footer: `<button class="btn" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveRack(null,'${id || ''}')">Simpan</button>`
+  });
+}
+function saveRack(ev, id){
+  if (ev) ev.preventDefault();
+  const code = $('mrCode').value.trim().toUpperCase(), name = $('mrName').value.trim(), locationId = $('mrLoc').value;
+  if (!code || !name) { toast('Semua field wajib.', 'err'); return false; }
+  if (db.racks.find(r => r.code === code && r.id !== id)) { toast('Kode rak sudah dipakai.', 'err'); return false; }
+  if (id) { Object.assign(db.racks.find(r => r.id === id), { code, name, locationId }); toast('Rak diperbarui.', 'ok'); }
+  else { db.racks.push({ id:'R' + (db.racks.length + 1 + Date.now() % 1000), code, name, locationId }); toast('Rak ditambahkan.', 'ok'); }
+  closeModal(); render(); return false;
+}
+function delRack(id){
+  const used = db.sj.some(s => s.lines.some(l => (l.receipts || []).some(r => r.rackId === id)));
+  if (used) { toast('Rak dipakai di penerimaan.', 'err'); return; }
+  if (db.shipments.some(sh => sh.lines.some(l => l.rackId === id))) { toast('Rak dipakai di pengiriman.', 'err'); return; }
+  if (!confirm('Hapus rak?')) return;
+  db.racks = db.racks.filter(r => r.id !== id); toast('Rak dihapus.', 'warn'); render();
+}
+
+/* =========================================================
+   24. TOAST & INIT
+   ========================================================= */
+function toast(msg, type){
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || '');
+  el.textContent = msg;
+  $('toastRoot').appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity .3s, transform .3s';
+    el.style.opacity = '0'; el.style.transform = 'translateX(20px)';
+    setTimeout(() => el.remove(), 320);
+  }, 3600);
+}
+
+initConsumption();
+initMovements();
+render();
+</script>
+</body>
+</html>
