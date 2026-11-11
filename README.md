@@ -49,24 +49,28 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 .
 ├── PRD — Sistem Gudang Titipan (Consignment Monitor).md   # spesifikasi lengkap
 ├── deepseek_html_20261111_b19203.html                     # prototipe UI (referensi)
+├── netlify.toml                                           # deploy Netlify + header CSP
 ├── backend/                                               # Google Apps Script
-│   ├── appsscript.json
+│   ├── .clasp.json
 │   └── src/
+│       ├── appsscript.json    # zona waktu, scope, konfigurasi Web App
 │       ├── Code.gs            # doGet, doPost, router, envelope
 │       ├── Auth.gs            # login, hash password, sesi, RBAC
 │       ├── Db.gs              # helper Sheets (baca/append/update/hapus)
 │       ├── Domain.gs          # pendingOf, lineStatus, sjStatus, stok, kartu stock
+│       ├── Setup.gs           # penyiapan database & user admin pertama
 │       ├── Util.gs            # tanggal, penomoran counter, validasi, escape
 │       └── Handlers_*.gs      # master, sj, shipment, stock, report
 ├── frontend/                                              # statis, deploy ke Netlify
 │   ├── index.html
 │   ├── login.html
-│   ├── _headers               # header keamanan + CSP
 │   ├── css/app.css
 │   └── js/
 │       ├── config.js          # API_URL per lingkungan (satu-satunya file yang diganti)
 │       ├── api.js             # klien API + envelope handling
 │       ├── state.js           # state + cache master data
+│       ├── main.js            # navigasi + bootstrap
+│       ├── login.js           # logika halaman login
 │       ├── pages/*.js
 │       ├── modals/*.js
 │       └── print.js

@@ -1,0 +1,61 @@
+# netlify.toml — Konfigurasi deploy Netlify (PRD 12.4)
+#
+# Repo ini berisi backend (Apps Script) dan frontend statis.
+# Netlify hanya men-deploy folder `frontend`; backend di-deploy terpisah
+# lewat clasp ke Google Apps Script.
+
+[build]
+  # Tidak ada build tool — frontend memakai ES Modules native.
+  command = ""
+  # Hanya folder ini yang di-publish.
+  publish = "frontend"
+
+# ---------------------------------------------------------------
+# Header keamanan (PRD bagian 9)
+#
+# connect-src dibatasi ke domain Google agar token/API tidak bisa
+# dikirim ke host lain. style-src butuh 'unsafe-inline' karena
+# beberapa elemen memakai atribut style.
+# ---------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+# ---------------------------------------------------------------
+# Cache
+#
+# JS/CSS tidak di-fingerprint (tanpa build tool), jadi jangan
+# di-cache lama agar perubahan langsung terpakai setelah deploy.
+# ---------------------------------------------------------------
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# ---------------------------------------------------------------
+# Redirect
+#
+# Aplikasi memakai file statis nyata (index.html, login.html),
+# bukan SPA router, jadi TIDAK dipakai catch-all "/* /index.html"
+# yang justru akan menutupi login.html.
+# ---------------------------------------------------------------
+
+# Halaman utama selalu ke index.html; api.js mengarahkan ke
+# login.html bila token tidak ada atau kedaluwarsa.
+
+# ---------------------------------------------------------------
+# Lingkungan
+# ---------------------------------------------------------------
+[context.production]
+  [context.production.environment]
+    NETLIFY_USE_YARN = "false"
