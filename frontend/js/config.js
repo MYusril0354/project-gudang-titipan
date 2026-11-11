@@ -12,7 +12,7 @@ window.CONFIG = {
   APP_ENV: 'DEV',
 
   /** URL /exec Web App Google Apps Script. GANTI INI. */
-  API_URL: 'https://script.google.com/macros/s/GANTI_DEPLOYMENT_ID/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbyx88o7CdWlCbN64GAJ35iQWZSTBc6C2QBTcz3oXXAMXpwF_c6YXJ0jVLV6snbixkTz/exec',
 
   /** Nama aplikasi & perusahaan cadangan (nilai asli dari system.bootstrap). */
   APP_NAME: 'Gudang Titipan',

@@ -8,7 +8,8 @@
 
 # Kredensial clasp / Apps Script
 .clasprc.json
-.clasp.json
+# .clasp.json SENGAJA di-commit: berisi scriptId, bukan rahasia,
+# dan diperlukan agar `clasp push` bisa dijalankan dari clone baru.
 
 # ---- Dependencies ----
 node_modules/

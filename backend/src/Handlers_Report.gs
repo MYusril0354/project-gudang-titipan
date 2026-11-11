@@ -8,11 +8,18 @@
 /** Satu panggilan: master data + konstanta + tanggal server + info perusahaan. */
 function systemBootstrap_(params, ctx) {
   return {
-    products: [], customers: [], locations: [], racks: [],
-    constants: { alasan: ALASAN_ },
+    products: readMaster_('product'),
+    customers: readMaster_('customer'),
+    locations: readMaster_('location'),
+    racks: readMaster_('rack'),
+    constants: {
+      alasan: ALASAN_,
+      satuan: SATUAN_,
+      role: ROLES
+    },
     serverDate: todayStr_(),
     company: getCompany_(),
-    user: ctx ? { username: ctx.username, role: ctx.role } : null
+    user: ctx ? { userId: ctx.userId, username: ctx.username, nama: ctx.nama, role: ctx.role } : null
   };
 }
 
@@ -49,6 +56,9 @@ var ALASAN_ = {
   SALAH_INPUT: 'Salah input / perlu koreksi',
   LAINNYA: 'Lainnya'
 };
+
+/** Satuan produk yang diizinkan (PRD 6.8). */
+var SATUAN_ = ['pcs', 'rim', 'pak', 'box', 'lusin', 'unit', 'kg', 'liter'];
 
 /** Info kop surat — dibaca dari Script Properties agar bisa diubah tanpa deploy. */
 function getCompany_() {

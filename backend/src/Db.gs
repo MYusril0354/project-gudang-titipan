@@ -3,13 +3,11 @@
  *
  * Prinsip (PRD bagian 10 & 13):
  *  - Satu spreadsheet, satu sheet per tabel, baris 1 = header.
- *  - Baca satu tabel dengan SATU getValues() per request (jangan per baris).
+ *  - Baca satu tabel dengan SATU getValues() per request (bukan per baris).
  *  - Kolom `id` diisi server; semua tabel punya created_at/by, updated_at/by.
- *
- * Implementasi lengkap masuk Fase 0.
  */
 
-/** ID spreadsheet database — diisi saat setup (Script Properties). */
+/** Nama Script Property untuk ID spreadsheet database. */
 var PROP_SPREADSHEET_ID = 'SPREADSHEET_ID';
 
 /** Nama sheet sesuai model data (PRD bagian 10). */
@@ -19,28 +17,6 @@ var TABLES_ = [
   'shipments', 'shipment_lines', 'shipment_consumptions',
   'movements', 'counters', 'audit_log', 'error_log'
 ];
-
-/** Workbook database aktif. */
-function db_() {
-  var id = PropertiesService.getScriptProperties().getProperty(PROP_SPREADSHEET_ID);
-  if (!id) throw apiError_('INTERNAL', 'SPREADSHEET_ID belum diset di Script Properties.');
-  return SpreadsheetApp.openById(id);
-}
-
-/** Sheet berdasarkan nama, dibuat bila belum ada (beserta header). */
-function sheet_(name) {
-  var ss = db_();
-  var sh = ss.getSheetByName(name);
-  if (!sh) {
-    sh = ss.insertSheet(name);
-    var headers = HEADERS_[name];
-    if (headers) {
-      sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
-      sh.setFrozenRows(1);
-    }
-  }
-  return sh;
-}
 
 /** Definisi kolom tiap tabel (baris 1 sheet). */
 var HEADERS_ = {
@@ -63,36 +39,191 @@ var HEADERS_ = {
   error_log: ['id', 'timestamp', 'code', 'message', 'stack', 'request']
 };
 
-/** Baca seluruh tabel menjadi array objek. */
-function readTable_(name) {
-  // Fase 0: implementasi getValues() sekali baca + map ke objek.
-  return [];
+/** Workbook database aktif. */
+function db_() {
+  var id = PropertiesService.getScriptProperties().getProperty(PROP_SPREADSHEET_ID);
+  if (!id) throw apiError_('INTERNAL', 'SPREADSHEET_ID belum diset di Script Properties.');
+  return SpreadsheetApp.openById(id);
 }
 
-/** Tambah satu baris. */
+/** Sheet berdasarkan nama, dibuat beserta header bila belum ada. */
+function sheet_(name) {
+  var headers = HEADERS_[name];
+  if (!headers) throw apiError_('INTERNAL', 'Tabel tidak dikenal: ' + name);
+
+  var ss = db_();
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/** Pastikan semua tabel ada beserta header-nya. */
+function ensureAllTables_() {
+  var created = [];
+  TABLES_.forEach(function (name) {
+    var ss = db_();
+    if (!ss.getSheetByName(name)) created.push(name);
+    sheet_(name);
+  });
+  return created;
+}
+
+/**
+ * Baca seluruh tabel menjadi array objek (satu getValues per tabel).
+ * @param {string} name nama sheet
+ * @returns {Object[]}
+ */
+function readTable_(name) {
+  var headers = HEADERS_[name];
+  if (!headers) throw apiError_('INTERNAL', 'Tabel tidak dikenal: ' + name);
+
+  var sh = sheet_(name);
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+
+  var values = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  var rows = [];
+  for (var r = 0; r < values.length; r++) {
+    var obj = {};
+    var hasValue = false;
+    for (var c = 0; c < headers.length; c++) {
+      var v = values[r][c];
+      obj[headers[c]] = v;
+      if (v !== '' && v !== null && v !== undefined) hasValue = true;
+    }
+    if (hasValue) rows.push(obj);
+  }
+  return rows;
+}
+
+/** Baca satu tabel dengan filter sederhana {kolom: nilai}. */
+function readTableWhere_(name, filter) {
+  return readTable_(name).filter(function (row) {
+    return Object.keys(filter).every(function (k) { return String(row[k]) === String(filter[k]); });
+  });
+}
+
+/** Nama kolom kunci sebuah tabel: 'id' bila ada, selain itu header pertama. */
+function idKey_(name) {
+  var headers = HEADERS_[name];
+  return headers.indexOf('id') !== -1 ? 'id' : headers[0];
+}
+
+/** Indeks baris (1-based, termasuk header) berdasarkan kunci; -1 bila tidak ada. */
+function rowIndexByKey_(name, key) {
+  var sh = sheet_(name);
+  var headers = HEADERS_[name];
+  var col = headers.indexOf(idKey_(name)) + 1;
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return -1;
+
+  var values = sh.getRange(2, col, lastRow - 1, 1).getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0]) === String(key)) return i + 2;
+  }
+  return -1;
+}
+
+/** Tambah satu baris. Mengisi `id` otomatis bila tabel memilikinya. */
 function appendRow_(name, obj) {
-  // Fase 0
+  var headers = HEADERS_[name];
+  if (!obj[idKey_(name)] && headers.indexOf('id') !== -1) obj.id = newId_();
+
+  var sh = sheet_(name);
+  var row = headers.map(function (h) {
+    var v = obj[h];
+    return v === undefined || v === null ? '' : v;
+  });
+  sh.appendRow(row);
   return obj;
 }
 
-/** Update baris berdasarkan id. */
-function updateById_(name, id, patch) {
-  // Fase 0
-  return patch;
+/** Tambah banyak baris sekaligus (lebih cepat daripada appendRow_ berulang). */
+function appendRows_(name, objs) {
+  if (!objs || !objs.length) return [];
+  var headers = HEADERS_[name];
+  var hasId = headers.indexOf('id') !== -1;
+
+  var rows = objs.map(function (obj) {
+    if (hasId && !obj.id) obj.id = newId_();
+    return headers.map(function (h) {
+      var v = obj[h];
+      return v === undefined || v === null ? '' : v;
+    });
+  });
+
+  var sh = sheet_(name);
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+  return objs;
 }
 
-/** Hapus baris berdasarkan id. */
-function deleteById_(name, id) {
-  // Fase 0
+/**
+ * Update baris berdasarkan kunci.
+ * @param {string} name nama tabel
+ * @param {string} key nilai kolom kunci
+ * @param {Object} patch kolom yang diubah
+ * @returns {Object|null} objek hasil gabungan, atau null bila tidak ditemukan
+ */
+function updateById_(name, key, patch) {
+  var idx = rowIndexByKey_(name, key);
+  if (idx === -1) return null;
+
+  var headers = HEADERS_[name];
+  var sh = sheet_(name);
+  var current = sh.getRange(idx, 1, 1, headers.length).getValues()[0];
+  var updated = Object.assign({}, patch);
+
+  Object.keys(patch).forEach(function (col) {
+    var c = headers.indexOf(col);
+    if (c !== -1) current[c] = patch[col] === undefined || patch[col] === null ? '' : patch[col];
+  });
+
+  sh.getRange(idx, 1, 1, headers.length).setValues([current]);
+  return current;
+}
+
+/** Hapus baris berdasarkan kunci. */
+function deleteById_(name, key) {
+  var idx = rowIndexByKey_(name, key);
+  if (idx === -1) return false;
+  sheet_(name).deleteRow(idx);
   return true;
 }
 
+/* =========================================================
+   COUNTER — penomoran dokumen (PRD 6.2, 6.3, 6.7)
+   ========================================================= */
+
+/** Nilai counter saat ini (0 bila belum ada). */
 function getCounter_(key) {
-  // Fase 0
+  var rows = readTable_('counters');
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].key) === String(key)) return Number(rows[i].value || 0);
+  }
   return 0;
 }
 
+/** Set nilai counter (upsert). */
 function setCounter_(key, value) {
-  // Fase 0
+  var idx = rowIndexByKey_('counters', key);
+  var sh = sheet_('counters');
+  if (idx === -1) {
+    sh.appendRow([key, value]);
+  } else {
+    sh.getRange(idx, 2).setValue(value);
+  }
   return value;
+}
+
+/* =========================================================
+   ID
+   ========================================================= */
+
+/** ID unik untuk kolom `id` (UUID — menggantikan Date.now() % 1000). */
+function newId_() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 16);
 }

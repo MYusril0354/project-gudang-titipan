@@ -21,6 +21,7 @@ var API_VERSION = '0.1.0';
 var ROUTES = {
   /* --- publik --- */
   'system.health': { fn: function () { return healthPayload_(); }, public: true, write: false },
+  'system.setup': { fn: systemSetup_, public: true, write: true },
   'auth.login': { fn: authLogin_, public: true, write: true },
 
   /* --- semua peran --- */

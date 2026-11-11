@@ -76,34 +76,47 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
     └── RENCANA.md             # rencana implementasi per fase
 ```
 
-## 4. Memulai
+## 4. Status Backend (sudah ter-deploy)
 
-### Prasyarat
-- Git
-- Akses ke Google Account (untuk Apps Script + Sheets)
-- [clasp](https://github.com/google/clasp) (`npm i -g @google/clasp`) — opsional tapi disarankan
+| Item | Nilai |
+| --- | --- |
+| Proyek Apps Script | Gudang Titipan API |
+| Deployment | Web App v4 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
+| Spreadsheet database | `database_gudang_titipan` (17 tabel) |
+| Zona waktu | `Asia/Jakarta` |
+| Endpoint | URL `/exec` sudah diisi di [frontend/js/config.js](frontend/js/config.js) |
 
-### Backend (GAS)
+### Perintah harian
 
 ```bash
 cd backend
-clasp login
-clasp create --type webapp --title "Gudang Titipan API"
-clasp push
+clasp push                 # kirim perubahan kode ke Apps Script
+clasp create-version       # buat versi baru (wajib sebelum deploy ulang)
+clasp list-deployments     # lihat ID deployment
 ```
 
-Lalu deploy sebagai Web App: **Execute as** = *Me*, **Who has access** = *Anyone*.
-Salin URL `/exec` hasil deploy.
+Setelah `clasp push`, Web App **belum** ikut berubah sampai deployment
+dipindah ke versi baru. Bila memakai *Manage deployments → Edit → New version*,
+URL `/exec` tetap sama.
 
-### Frontend
+### Setup database
+
+Action `system.setup` menyiapkan 17 sheet + header, user ADMIN pertama, dan
+counter awal. Aman dijalankan berulang.
+
+> `system.setup` hanya bisa dipanggil tanpa kunci bila sistem **belum**
+> dikonfigurasi. Setelah itu `SETUP_KEY` tersimpan di Script Properties dan
+> wajib dikirim. Jangan bagikan `SETUP_KEY` maupun spreadsheet ke publik.
+
+### Menjalankan frontend
 
 ```bash
 cd frontend
-# isi js/config.js dengan URL /exec dari langkah di atas
 npx serve .
 ```
 
-Deploy ke Netlify: hubungkan repo ini, **publish directory** = `frontend`, **build command** kosong.
+Buka halaman yang ditampilkan, lalu login. Deploy ke Netlify:
+**publish directory** = `frontend`, **build command** kosong.
 
 ## 5. Kontrak API (ringkas)
 
