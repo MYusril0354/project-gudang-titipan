@@ -12,6 +12,7 @@
 import { CONFIG } from './config.js';
 import { clearSession, getToken, auth, system } from './api.js';
 import { state, applyBootstrap, fmtDate } from './state.js';
+import { renderMasterPage } from './pages/master.js';
 
 /* =========================================================
    Definisi halaman & hak akses tampilan
@@ -118,7 +119,7 @@ export function go(route) {
   window.scrollTo({ top: 0 });
 }
 
-/** Render isi halaman. Tiap halaman diisi pada fase berikutnya. */
+/** Render isi halaman sesuai route. */
 async function renderRoute(route) {
   const page = PAGES.find((p) => p.route === route) || PAGES[0];
   document.getElementById('pageTitle').textContent = page.label;
@@ -127,7 +128,13 @@ async function renderRoute(route) {
   const view = document.getElementById('view');
   view.innerHTML = '';
 
-  // Placeholder sampai halaman diimplementasikan (Fase 2-4).
+  // Halaman yang sudah diimplementasikan.
+  if (route === 'master') {
+    await renderMasterPage(view, { tab: state.masterTab });
+    return;
+  }
+
+  // Placeholder untuk halaman yang belum diimplementasikan.
   const panel = document.createElement('div');
   panel.className = 'panel';
   const body = document.createElement('div');
@@ -176,5 +183,19 @@ function showFatal(err) {
   panel.appendChild(body);
   view.appendChild(panel);
 }
+
+/** Toast notifikasi global (dipakai halaman & modal). */
+window.toast = function toast(message, type = 'ok') {
+  const root = document.getElementById('toastRoot');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = message;
+  root.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .3s';
+    setTimeout(() => el.remove(), 320);
+  }, 3200);
+};
 
 boot();
