@@ -7,7 +7,9 @@
  * Catatan: URL /exec tetap sama bila memakai "Edit -> New version".
  * Membuat deployment baru akan menghasilkan URL berbeda (PRD 12.4).
  */
-window.CONFIG = {
+
+/** Konfigurasi aplikasi (dipakai bersama modul lain). */
+export const CONFIG = {
   /** 'DEV' atau 'PROD' — dipakai untuk label di UI dan log. */
   APP_ENV: 'DEV',
 
@@ -24,3 +26,6 @@ window.CONFIG = {
   /** Debounce pencarian (ms) — PRD 12.3. */
   SEARCH_DEBOUNCE_MS: 300
 };
+
+/** Ekspos juga sebagai global bila ada konteks non-module. */
+window.CONFIG = CONFIG;
