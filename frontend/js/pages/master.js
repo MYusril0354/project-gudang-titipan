@@ -184,7 +184,7 @@ function buildTable(items, conf) {
   }
 
   const table = document.createElement('table');
-  table.className = 'tbl';
+  table.className = 'tbl tbl-resp';
 
   const thead = document.createElement('thead');
   const hr = document.createElement('tr');
@@ -201,12 +201,14 @@ function buildTable(items, conf) {
   items.forEach((it, i) => {
     const tr = document.createElement('tr');
     const num = document.createElement('td');
-    num.className = 'num';
+    num.className = 'num tbl-idx';
+    num.dataset.label = '';
     num.textContent = String(i + 1);
     tr.appendChild(num);
 
     for (const col of conf.cols) {
       const td = document.createElement('td');
+      td.dataset.label = col.label;
       if (col.badge) {
         const badge = document.createElement('span');
         badge.className = 'badge ' + (it[col.key] === 'MAIN' ? 'b-gray' : 'b-brand');
@@ -220,6 +222,7 @@ function buildTable(items, conf) {
 
     const actions = document.createElement('td');
     actions.className = 'num actions';
+    actions.dataset.label = '';
     const edit = document.createElement('button');
     edit.className = 'btn btn-sm';
     edit.type = 'button';

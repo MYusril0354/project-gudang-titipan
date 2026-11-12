@@ -113,7 +113,7 @@ function buildCard(item) {
   ]);
 
   const rows = item.lines.map((line) => buildLineRow(item, line));
-  const table = el('table', { class: 'tbl' }, [
+  const table = el('table', { class: 'tbl tbl-resp' }, [
     el('thead', {}, [
       el('tr', {}, [
         el('th', { text: 'Produk / Kode' }),
@@ -135,19 +135,19 @@ function buildLineRow(sjItem, line) {
   const meta = STATUS_META[line.status] || STATUS_META.OPEN;
 
   // Kolom produk
-  const productCell = el('td', {}, [
+  const productCell = el('td', { 'data-label': 'Produk' }, [
     el('div', {}, [el('b', { text: line.productName })]),
     el('div', { class: 'sub' }, [kodeTag(line.productCode)])
   ]);
 
   // Qty SJ
-  const qtyCell = el('td', { class: 'num' }, [
+  const qtyCell = el('td', { class: 'num', 'data-label': 'Qty SJ' }, [
     document.createTextNode(fmt(line.qtySj) + ' '),
     sub(line.unit)
   ]);
 
   // Diterima + daftar batch
-  const receivedCell = el('td', { class: 'num' }, [document.createTextNode(fmt(line.qtyReceived))]);
+  const receivedCell = el('td', { class: 'num', 'data-label': 'Diterima' }, [document.createTextNode(fmt(line.qtyReceived))]);
   for (const r of line.receipts) {
     receivedCell.appendChild(el('div', { class: 'sub', style: { marginTop: '4px' } }, [
       batchTag(r.batchNumber),
@@ -158,10 +158,10 @@ function buildLineRow(sjItem, line) {
   }
 
   // Pending
-  const pendingCell = el('td', { class: 'num' }, [el('b', { text: fmt(line.pending) })]);
+  const pendingCell = el('td', { class: 'num', 'data-label': 'Pending' }, [el('b', { text: fmt(line.pending) })]);
 
   // Status + info alasan/ETA/PIC
-  const statusCell = el('td', {}, [badge(meta.label, meta.cls)]);
+  const statusCell = el('td', { 'data-label': 'Status' }, [badge(meta.label, meta.cls)]);
   if (line.status === 'WAITING_PHYSICAL' || line.status === 'PARTIALLY_RECEIVED') {
     if (line.alasanLabel) {
       statusCell.appendChild(sub(`${line.alasanLabel} • ETA ${fmtDate(line.eta)} • PIC ${line.pic || '—'}`));
@@ -172,7 +172,7 @@ function buildLineRow(sjItem, line) {
   }
 
   // Aksi
-  const actions = el('td', { class: 'num' });
+  const actions = el('td', { class: 'num', 'data-label': '' });
   const group = el('div', { class: 'btn-group' });
   const ctx = {
     sjNo: sjItem.no,

@@ -10,7 +10,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { clearSession, getToken, auth, system } from './api.js';
+import { clearSession, getToken, auth, system, sj, pending } from './api.js';
 import { state, applyBootstrap, fmtDate } from './state.js';
 import { renderMasterPage } from './pages/master.js';
 import { renderPenerimaanPage } from './pages/penerimaan.js';
@@ -21,18 +21,27 @@ import { el } from './ui.js';
    Definisi halaman & hak akses tampilan
    ========================================================= */
 
-const PAGES = [
-  { route: 'dashboard', label: 'Dashboard', sub: 'Ringkasan stok titipan dan pending fisik', roles: null },
-  { route: 'penerimaan', label: 'Penerimaan SJ', sub: 'Daftar Surat Jalan dan penerimaan fisik', roles: null },
-  { route: 'pending', label: 'Fisik Belum Ada', sub: 'Antrean barang yang fisiknya belum diterima', roles: null },
-  { route: 'stok', label: 'Stok Titipan', sub: 'Posisi stok per batch', roles: null },
-  { route: 'pengiriman', label: 'Pengiriman', sub: 'Surat jalan keluar dari gudang titipan', roles: null },
-  { route: 'kartu', label: 'Kartu Stock', sub: 'Mutasi dan saldo berjalan per batch', roles: null },
-  { route: 'laporan', label: 'Rekonsiliasi', sub: 'Total masuk, keluar, stok, dan selisih', roles: null },
-  { route: 'master', label: 'Master Data', sub: 'Produk, pelanggan, gudang, dan rak', roles: null },
-  { route: 'pengguna', label: 'Pengguna', sub: 'Kelola akun dan peran', roles: ['ADMIN'] },
-  { route: 'audit', label: 'Audit Log', sub: 'Jejak aktivitas pengguna', roles: ['ADMIN'] }
+const GROUPS = [
+  { key: 'operasional', label: 'Operasional' },
+  { key: 'pelaporan', label: 'Pelaporan' },
+  { key: 'admin', label: 'Administrasi' }
 ];
+
+const PAGES = [
+  { route: 'dashboard', group: 'operasional', label: 'Dashboard', sub: 'Ringkasan stok titipan dan pending fisik', roles: null },
+  { route: 'penerimaan', group: 'operasional', label: 'Penerimaan SJ', sub: 'Daftar Surat Jalan dan penerimaan fisik', roles: null, badgeKey: 'openSj' },
+  { route: 'pending', group: 'operasional', label: 'Fisik Belum Ada', sub: 'Antrean barang yang fisiknya belum diterima', roles: null, badgeKey: 'pendingLines' },
+  { route: 'stok', group: 'operasional', label: 'Stok Titipan', sub: 'Posisi stok per batch', roles: null },
+  { route: 'pengiriman', group: 'operasional', label: 'Pengiriman', sub: 'Surat jalan keluar dari gudang titipan', roles: null },
+  { route: 'kartu', group: 'pelaporan', label: 'Kartu Stock', sub: 'Mutasi dan saldo berjalan per batch', roles: null },
+  { route: 'laporan', group: 'pelaporan', label: 'Rekonsiliasi', sub: 'Total masuk, keluar, stok, dan selisih', roles: null },
+  { route: 'master', group: 'admin', label: 'Master Data', sub: 'Produk, pelanggan, gudang, dan rak', roles: null },
+  { route: 'pengguna', group: 'admin', label: 'Pengguna', sub: 'Kelola akun dan peran', roles: ['ADMIN'] },
+  { route: 'audit', group: 'admin', label: 'Audit Log', sub: 'Jejak aktivitas pengguna', roles: ['ADMIN'] }
+];
+
+/** Angka kecil di daftar menu (diisi setelah bootstrap, non-blocking). */
+let navBadges = { openSj: 0, pendingLines: 0 };
 
 const ICONS = {
   dashboard: '<path d="M3 13h8V3H3zM13 21h8v-8h-8zM13 3v6h8V3zM3 21h8v-4H3z"/>',
@@ -57,6 +66,7 @@ async function boot() {
     return;
   }
 
+  initNavToggle();
   renderNav();
 
   // Label lingkungan — membantu memastikan tidak salah arah ke PROD/DEV.
@@ -69,6 +79,7 @@ async function boot() {
     renderToday();
     renderNav(); // filter ulang setelah peran diketahui
     renderRoute(state.route);
+    loadBadges(); // angka menu (pending/open) — non-blocking
   } catch (err) {
     showFatal(err);
   }
@@ -97,21 +108,88 @@ function renderToday() {
   document.getElementById('todayLabel').textContent = fmtDate(state.serverDate);
 }
 
+/** Sidebar off-canvas (mobile): buka/tutup. */
+function initNavToggle() {
+  const btn = document.getElementById('navToggle');
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  if (!btn || !sidebar || !overlay) return;
+
+  const open = () => {
+    sidebar.classList.add('open');
+    overlay.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    sidebar.classList.remove('open');
+    overlay.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+
+  btn.addEventListener('click', () => (sidebar.classList.contains('open') ? close() : open()));
+  overlay.addEventListener('click', close);
+}
+
+/** Tutup sidebar (dipakai setelah pilih menu pada layar kecil). */
+function closeSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const btn = document.getElementById('navToggle');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
 /** Navigasi sesuai peran (VIEWER tidak melihat menu tulis — PRD 12.3). */
 function renderNav() {
   const role = state.user ? state.user.role : null;
   const nav = document.getElementById('nav');
   nav.innerHTML = '';
 
-  PAGES.filter((p) => !p.roles || (role && p.roles.includes(role))).forEach((p) => {
-    const btn = document.createElement('button');
-    btn.className = 'nav-item' + (p.route === state.route ? ' active' : '');
-    btn.type = 'button';
-    btn.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[p.route] || ''}</svg><span></span>`;
-    btn.querySelector('span').textContent = p.label; // textContent -> aman dari XSS
-    btn.addEventListener('click', () => go(p.route));
-    nav.appendChild(btn);
-  });
+  const visible = PAGES.filter((p) => !p.roles || (role && p.roles.includes(role)));
+
+  for (const group of GROUPS) {
+    const inGroup = visible.filter((p) => p.group === group.key);
+    if (!inGroup.length) continue;
+
+    const heading = document.createElement('div');
+    heading.className = 'nav-group';
+    heading.textContent = group.label;
+    nav.appendChild(heading);
+
+    for (const p of inGroup) {
+      const btn = document.createElement('button');
+      btn.className = 'nav-item' + (p.route === state.route ? ' active' : '');
+      btn.type = 'button';
+      btn.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[p.route] || ''}</svg><span></span>`;
+      btn.querySelector('span').textContent = p.label; // textContent -> aman dari XSS
+
+      const count = p.badgeKey ? navBadges[p.badgeKey] : 0;
+      if (count > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        badge.textContent = String(count);
+        btn.appendChild(badge);
+      }
+
+      btn.addEventListener('click', () => go(p.route));
+      nav.appendChild(btn);
+    }
+  }
+}
+
+/** Ambil angka menu (pending baris + SJ terbuka) tanpa memblokir render. */
+async function loadBadges() {
+  try {
+    const [sjRes, pendingRes] = await Promise.all([
+      sj.list({}),
+      pending.list({})
+    ]);
+    navBadges.openSj = (sjRes.counts && sjRes.counts.open) || 0;
+    navBadges.pendingLines = ((pendingRes.totals && pendingRes.totals.rows) || 0)
+      + ((pendingRes.totals && pendingRes.totals.openRows) || 0);
+    renderNav();
+  } catch (ignore) { /* angka menu bersifat opsional */ }
 }
 
 /** Pindah halaman. */
@@ -119,6 +197,7 @@ export function go(route) {
   state.route = route;
   renderNav();
   renderRoute(route);
+  closeSidebar();
   window.scrollTo({ top: 0 });
 }
 

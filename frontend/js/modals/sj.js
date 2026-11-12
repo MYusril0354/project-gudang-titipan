@@ -13,7 +13,7 @@ import { sj } from '../api.js';
 import { state, fmt, fmtDate } from '../state.js';
 import { racksOfCustomer, consignLocationOf } from '../state.js';
 import {
-  el, btn, modal, field, select, grid2, infobox, toast, kodeTag
+  el, btn, modal, field, select, grid2, infobox, toast, kodeTag, callout
 } from '../ui.js';
 
 /** Error pertama dari server ditandai pada field terkait. */
@@ -243,13 +243,11 @@ export async function openCancel(line, onDone) {
     title: 'Batalkan Sisa Pending',
     sub: 'Hanya untuk barang yang dipastikan tidak akan datang',
     body: [
-      el('div', { class: 'callout callout-amber', style: { marginBottom: '16px' } }, [
-        el('div', { text: '⚠️' }),
-        el('div', {
-          text: `Membatalkan ${fmt(line.pending)} ${line.unit} dari ${line.sjNo}. `
-            + 'Alasan dan catatan disimpan dan tampil di rekonsiliasi.'
-        })
-      ]),
+      callout(
+        `Membatalkan ${fmt(line.pending)} ${line.unit} dari ${line.sjNo}. `
+          + 'Alasan dan catatan disimpan dan tampil di rekonsiliasi.',
+        'amber'
+      ),
       field('Alasan', reasonSelect, null, true),
       field('Catatan', noteInput,
         'Wajib diisi bila alasan "Lainnya".', false)

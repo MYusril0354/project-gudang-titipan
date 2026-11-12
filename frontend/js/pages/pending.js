@@ -122,29 +122,29 @@ function buildQueueTable(items, reload) {
     ]);
 
     return el('tr', {}, [
-      el('td', {}, [
+      el('td', { 'data-label': 'Surat Jalan' }, [
         el('div', { class: 'mono', text: r.sjNo }),
         sub(fmtDate(r.sjDate))
       ]),
-      el('td', {}, [el('b', { text: r.customerName })]),
-      el('td', {}, [
+      el('td', { 'data-label': 'Pelanggan' }, [el('b', { text: r.customerName })]),
+      el('td', { 'data-label': 'Produk' }, [
         el('div', { text: r.productName }),
         el('div', { class: 'sub' }, [kodeTag(r.productCode)])
       ]),
-      el('td', { class: 'num', text: fmt(r.qtySj) }),
-      el('td', { class: 'num', text: fmt(r.qtyReceived) }),
-      el('td', { class: 'num' }, [el('b', { text: fmt(r.pending) })]),
-      el('td', {}, [umurBadge(r.umurDays)]),
-      el('td', {}, [
+      el('td', { class: 'num', 'data-label': 'Qty SJ', text: fmt(r.qtySj) }),
+      el('td', { class: 'num', 'data-label': 'Diterima', text: fmt(r.qtyReceived) }),
+      el('td', { class: 'num', 'data-label': 'Pending' }, [el('b', { text: fmt(r.pending) })]),
+      el('td', { 'data-label': 'Umur' }, [umurBadge(r.umurDays)]),
+      el('td', { 'data-label': 'Alasan' }, [
         el('div', { text: r.alasanLabel || '—' }),
         sub(`PIC ${r.pic || '—'}`)
       ]),
-      el('td', { text: fmtDate(r.eta) }),
-      el('td', { class: 'num' }, [actions])
+      el('td', { 'data-label': 'ETA', text: fmtDate(r.eta) }),
+      el('td', { class: 'num', 'data-label': '' }, [actions])
     ]);
   });
 
-  return el('table', { class: 'tbl' }, [
+  return el('table', { class: 'tbl tbl-resp' }, [
     el('thead', {}, [
       el('tr', {}, [
         el('th', { text: 'Surat Jalan' }),
@@ -186,18 +186,18 @@ function buildOpenTable(items, reload) {
     ]);
 
     return el('tr', {}, [
-      el('td', { class: 'mono', text: r.sjNo }),
-      el('td', { text: r.customerName }),
-      el('td', {}, [
+      el('td', { class: 'mono', 'data-label': 'Surat Jalan', text: r.sjNo }),
+      el('td', { 'data-label': 'Pelanggan', text: r.customerName }),
+      el('td', { 'data-label': 'Produk' }, [
         document.createTextNode(r.productName + ' '),
         kodeTag(r.productCode)
       ]),
-      el('td', { class: 'num', text: fmt(r.pending) }),
-      el('td', { class: 'num' }, [actions])
+      el('td', { class: 'num', 'data-label': 'Qty', text: fmt(r.pending) }),
+      el('td', { class: 'num', 'data-label': '' }, [actions])
     ]);
   });
 
-  return el('table', { class: 'tbl' }, [
+  return el('table', { class: 'tbl tbl-resp' }, [
     el('thead', {}, [
       el('tr', {}, [
         el('th', { text: 'Surat Jalan' }),

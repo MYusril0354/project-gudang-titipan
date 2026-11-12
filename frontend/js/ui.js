@@ -67,6 +67,28 @@ export function badge(label, cls) {
   return el('span', { class: 'badge ' + (cls || 'b-gray'), text: label });
 }
 
+/** Ikon SVG (stroke, 24x24 viewBox). */
+const UI_ICONS = {
+  rack: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
+  tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.3"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 11v5"/>',
+  warn: '<path d="M12 3l9 16H3z"/><path d="M12 9v4M12 17h.01"/>'
+};
+
+/** Buat elemen <svg> ikon. */
+export function icon(name) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('aria-hidden', 'true');
+  s.innerHTML = UI_ICONS[name] || '';
+  return s;
+}
+
+/** Teks + ikon kecil (dipakai tag rak/batch/dll). */
+function icontag(cls, iconName, text) {
+  return el('span', { class: cls }, [icon(iconName), document.createTextNode(text || '—')]);
+}
+
 /** Tag kode produk. */
 export function kodeTag(code) {
   return el('span', { class: 'kode', text: code || '—' });
@@ -74,12 +96,12 @@ export function kodeTag(code) {
 
 /** Tag rak. */
 export function rakTag(code) {
-  return el('span', { class: 'rak', text: '📍 ' + (code || '—') });
+  return icontag('rak', 'rack', code || '—');
 }
 
 /** Tag nomor batch. */
 export function batchTag(no) {
-  return el('span', { class: 'batchtag', text: '🏷 ' + (no || '—') });
+  return icontag('batchtag', 'tag', no || '—');
 }
 
 /** Tag nomor SJ. */
@@ -115,7 +137,7 @@ export function emptyBox(title, note) {
 /** Callout info. */
 export function callout(text, variant) {
   return el('div', { class: 'callout callout-' + (variant || 'blue') }, [
-    el('div', { text: variant === 'amber' ? '⚠️' : 'ℹ️' }),
+    icon(variant === 'amber' ? 'warn' : 'info'),
     el('div', { text })
   ]);
 }
