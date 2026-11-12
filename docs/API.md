@@ -173,3 +173,52 @@ company{}` — dipakai `frontend/js/print.js`. Pengiriman `VOID` ditolak.
 ADMIN saja, `reason` wajib. Status menjadi `VOID`; stok kembali otomatis karena
 pengiriman VOID diabaikan saat menghitung sisa batch, dan dicatat mutasi
 `VOID_OUT` (+qty) untuk jejak kartu stock.
+
+## 6. Kontrak Laporan (Fase 4)
+
+### `dashboard.summary`
+
+```json
+{ "action": "dashboard.summary", "params": {} }
+```
+
+Balasan: `stockTotal, stockBatches, stockCustomers, pendingPhysical, pendingRows,
+oldestPendingDays, sjNotFinished, sjOpen, sjWaiting, openLines, notDelivered,
+hangingDifference, topPending[5], stockByCustomer[]`.
+
+### `ledger.kartuStock`
+
+```json
+{ "action": "ledger.kartuStock", "params": {
+  "code": "", "batch": "", "customerId": "", "from": "", "to": "" } }
+```
+
+`code` dan `batch` adalah pencarian sebagian (contains). Balasan:
+`items[], totals:{rows,in,out,balance,batches}, filtered`.
+
+Tiap item: `{ date, type, ref, productId, productCode, productName, unit,
+batchNumber, rackId, rackCode, customerId, customerName, sjRef, note,
+qty, in, out, balance, isGroupStart, isGroupEnd }`.
+
+> `balance` adalah saldo berjalan **dari seluruh riwayat batch**, bukan hanya
+> baris yang lolos filter. Jadi memfilter tanggal tidak mengubah arti saldo —
+> hanya memilih baris mana yang ditampilkan.
+
+### `report.reconciliation`
+
+```json
+{ "action": "report.reconciliation", "params": { "limit": 15 } }
+```
+
+Balasan: `totalIn, totalOut, stock, hanging, variance, checks{stockFromBatches,
+stockFromMovements, balanced}, byType[], exceptions[], recentMovements[],
+totals{exceptionRows,movements,batches,shipments,sj}`.
+
+> `variance` = `stockFromBatches − stockFromMovements` dan **harus 0**. Nilai
+> selain 0 berarti ada data tidak konsisten antara pengurangan stok dan mutasi.
+
+### `user.*` dan `audit.list`
+
+`user.list` / `user.create` / `user.update` / `user.resetPassword` dan
+`audit.list` (ADMIN). `audit.list` menerima `q`, `page`, `pageSize` dan
+mengembalikan `{ items[], page, pageSize, total, totalPages }`.

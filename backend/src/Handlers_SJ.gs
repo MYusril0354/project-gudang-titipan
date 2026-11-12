@@ -285,46 +285,63 @@ function sjNextNumber_(params, ctx) {
   throw apiError_('INTERNAL', 'Tidak bisa menentukan nomor SJ berikutnya.');
 }
 
-/** Antrean pending fisik + baris belum diklasifikasi + bucket umur (PRD 6.4). */
-function pendingList_(params, ctx) {
-  var ds = sjDataset_();
-  var items = [];
-  var openItems = [];
+/**
+ * Baris SJ yang masih punya sisa pending, dihitung dari dataset bersama.
+ * Dipakai `pending.list`, dashboard, dan rekonsiliasi agar satu sumber hitungan.
+ * @param {Object} ds hasil stockDataset_()
+ * @returns {Object[]} baris pending siap pakai frontend
+ */
+function pendingRows_(ds) {
+  var rows = [];
 
   ds.sjs.forEach(function (s) {
     var customer = ds.customersById[String(s.customer_id)] || {};
-    (ds.linesByNo[String(s.no)] || []).forEach(function (raw) {
-      var v = sjLineView_(raw, ds);
-      if (v.pending <= 0) return;
+    (ds.sjLinesByNo[String(s.no)] || []).forEach(function (line) {
+      var receipts = ds.receiptsByLine[String(line.id)] || [];
+      var pending = pendingOf_(line, receipts);
+      if (pending <= 0) return;
 
-      var base = {
+      var product = ds.productsById[String(line.product_id)] || {};
+      rows.push({
         sjNo: s.no,
         sjDate: s.date,
         customerId: s.customer_id,
         customerName: customer.name || '(pelanggan terhapus)',
-        lineId: v.id,
-        productId: v.productId,
-        productCode: v.productCode,
-        productName: v.productName,
-        unit: v.unit,
-        qtySj: v.qtySj,
-        qtyReceived: v.qtyReceived,
-        pending: v.pending,
-        status: v.status,
+        lineId: line.id,
+        productId: line.product_id,
+        productCode: product.code || '',
+        productName: product.name || '(produk terhapus)',
+        unit: product.unit || '',
+        qtySj: Number(line.qty_sj || 0),
+        qtyReceived: qtyReceived_(line, receipts),
+        pending: pending,
+        status: lineStatus_(line, receipts),
+        alasan: line.alasan || '',
+        alasanLabel: ALASAN_[line.alasan] || '',
+        eta: line.eta || '',
+        pic: line.pic || '',
         umurDays: agingDays_(s.date)
-      };
-
-      if (v.status === 'WAITING_PHYSICAL' || v.status === 'PARTIALLY_RECEIVED') {
-        items.push(Object.assign(base, {
-          alasan: v.alasan,
-          alasanLabel: v.alasanLabel,
-          eta: v.eta,
-          pic: v.pic
-        }));
-      } else if (v.status === 'OPEN') {
-        openItems.push(base);
-      }
+      });
     });
+  });
+
+  return rows;
+}
+
+/** Antrean pending fisik + baris belum diklasifikasi + bucket umur (PRD 6.4). */
+function pendingList_(params, ctx) {
+  var ds = stockDataset_();
+  var all = pendingRows_(ds);
+
+  var items = [];
+  var openItems = [];
+
+  all.forEach(function (r) {
+    if (r.status === 'WAITING_PHYSICAL' || r.status === 'PARTIALLY_RECEIVED') {
+      items.push(r);
+    } else if (r.status === 'OPEN') {
+      openItems.push(r);
+    }
   });
 
   var q = String(params.q || '').trim().toLowerCase();

@@ -1,6 +1,6 @@
 # Rencana Implementasi
 
-Status saat ini: **Fase 3 selesai** (stok titipan & pengiriman berjalan end-to-end, backend live v20).
+Status saat ini: **Fase 4 selesai** — seluruh halaman aplikasi memakai data nyata. Backend live **v24**.
 
 ## Ringkas Status
 
@@ -10,8 +10,28 @@ Status saat ini: **Fase 3 selesai** (stok titipan & pengiriman berjalan end-to-e
 | **1. Auth & master** | `auth.*`, `users`, RBAC, `system.bootstrap`, CRUD master | ✅ Selesai |
 | **2. SJ & penerimaan** | `sj.*`, `pending.list`, counter, batch suggestion, receipts, cancellations | ✅ Selesai |
 | **3. Stok & pengiriman** | `stock.*`, `shipment.*`, consumption, movements, lock, POD, void, cetak | ✅ Selesai |
-| **4. Laporan** | `dashboard.summary`, `ledger.kartuStock`, `report.reconciliation` | ⬜ Belum |
-| **5. Hardening & rilis** | Audit log, backup harian, error log, uji beban, header keamanan, impor CSV, UAT, PROD | ⬜ Belum |
+| **4. Laporan** | `dashboard.summary`, `ledger.kartuStock`, `report.reconciliation`, `user.*`, `audit.list` | ✅ Selesai |
+| **5. Hardening & rilis** | Backup harian, error log, uji beban, header keamanan, impor CSV, UAT, PROD | ⬜ Belum |
+
+## Fase 4 — Selesai
+
+- `dashboard.summary` — 4 kartu (stok, pending fisik, SJ belum selesai, belum POD),
+  pending prioritas (5 tertua), stok per pelanggan
+- `ledger.kartuStock` — mutasi + saldo berjalan per batch; **saldo dihitung dari
+  seluruh riwayat batch**, jadi tetap benar walau difilter tanggal. Filter: kode
+  produk, batch, pelanggan, rentang tanggal
+- `report.reconciliation` — total masuk/keluar/stok, exception report, riwayat
+  mutasi, plus **pemeriksaan keseimbangan**: stok dari batch vs stok dari mutasi
+  (`variance` harus 0)
+- Halaman **Dashboard**, **Kartu Stock**, **Rekonsiliasi**, **Pengguna**, dan
+  **Audit Log** — tidak ada lagi halaman placeholder
+
+### Catatan teknis
+
+- `pending.list` di-refactor memakai `pendingRows_(ds)` di atas dataset bersama,
+  sehingga pending, dashboard, dan rekonsiliasi memakai SATU sumber hitungan.
+- `stockDataset_()` diperluas (sjs, sjLines, receiptsByLine, movements) agar satu
+  request laporan hanya membaca tiap sheet sekali.
 
 ## Fase 3 — Selesai
 
@@ -45,8 +65,10 @@ dokumen cetak di `print.js` (stylesheet A4 ditambahkan).
 
 ## Langkah Berikutnya
 
-1. **Fase 4 — Laporan**: `dashboard.summary`, `ledger.kartuStock`, `report.reconciliation` memakai data nyata.
+1. **Fase 5 — Hardening & rilis**: backup harian, error log ke sheet, uji beban,
+   impor CSV master, header keamanan, UAT, pemisahan lingkungan PROD.
 2. Hapus `system.setup` & `system.selfTest` dari router sebelum go-live (catatan keamanan).
+3. Polish lanjutan: pencarian global, soft-undo void, empty-state CTA.
 3. Polish lanjutan: pencarian global, soft-undo void, empty-state CTA.
 
 ## Fase 0 — Selesai
@@ -56,7 +78,7 @@ Hasil yang sudah terpasang:
 | Item | Nilai |
 | --- | --- |
 | Proyek Apps Script | "Gudang Titipan API" |
-| Deployment Web App | v20, `access: ANYONE_ANONYMOUS`, `executeAs: USER_DEPLOYING` |
+| Deployment Web App | v24, `access: ANYONE_ANONYMOUS`, `executeAs: USER_DEPLOYING` |
 | Spreadsheet database | `database_gudang_titipan` (17 tabel, header terverifikasi) |
 | Zona waktu | `Asia/Jakarta` |
 | Frontend `API_URL` | sudah diisi di `frontend/js/config.js` |

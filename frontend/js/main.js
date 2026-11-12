@@ -17,6 +17,11 @@ import { renderPenerimaanPage } from './pages/penerimaan.js';
 import { renderPendingPage } from './pages/pending.js';
 import { renderStokPage } from './pages/stok.js';
 import { renderPengirimanPage } from './pages/pengiriman.js';
+import { renderDashboardPage } from './pages/dashboard.js';
+import { renderKartuPage } from './pages/kartu.js';
+import { renderLaporanPage } from './pages/laporan.js';
+import { renderPenggunaPage } from './pages/pengguna.js';
+import { renderAuditPage } from './pages/audit.js';
 import { el } from './ui.js';
 
 /* =========================================================
@@ -215,6 +220,10 @@ async function renderRoute(route) {
   view.innerHTML = '';
 
   // Halaman yang sudah diimplementasikan.
+  if (route === 'dashboard') {
+    await renderDashboardPage(view);
+    return;
+  }
   if (route === 'master') {
     await renderMasterPage(view, { tab: state.masterTab });
     return;
@@ -235,12 +244,28 @@ async function renderRoute(route) {
     await renderPengirimanPage(view);
     return;
   }
+  if (route === 'kartu') {
+    await renderKartuPage(view);
+    return;
+  }
+  if (route === 'laporan') {
+    await renderLaporanPage(view);
+    return;
+  }
+  if (route === 'pengguna') {
+    await renderPenggunaPage(view);
+    return;
+  }
+  if (route === 'audit') {
+    await renderAuditPage(view);
+    return;
+  }
 
   // Placeholder untuk halaman yang belum diimplementasikan.
   view.appendChild(buildPlaceholder(page));
 }
 
-/** Placeholder halaman yang belum diimplementasikan. */
+/** Cadangan bila ada menu tanpa renderer (seharusnya tidak terjadi). */
 function buildPlaceholder(page) {
   return el('div', { class: 'panel' }, [
     el('div', { class: 'panel-body', style: { padding: '28px' } }, [
@@ -248,7 +273,7 @@ function buildPlaceholder(page) {
       el('div', {
         class: 'panel-sub',
         style: { marginTop: '6px' },
-        text: 'Halaman ini belum diimplementasikan. Menunggu fase pengembangan berikutnya.'
+        text: 'Halaman ini belum punya renderer. Laporkan sebagai bug.'
       })
     ])
   ]);
@@ -286,8 +311,13 @@ function showFatal(err) {
   view.appendChild(panel);
 }
 
-/** Toast notifikasi global (dipakai halaman & modal). */
-window.toast = function toast(message, type = 'ok') {
+/** Navigasi dari dalam halaman (dipakai ui.navigate) tanpa import melingkar. */
+window.addEventListener('app:navigate', (e) => {
+  const route = e && e.detail && e.detail.route;
+  if (route) go(route);
+});
+
+/** Toast notifikasi global (dipakai halaman & modal). */window.toast = function toast(message, type = 'ok') {
   const root = document.getElementById('toastRoot');
   const el = document.createElement('div');
   el.className = 'toast ' + type;

@@ -218,6 +218,14 @@ export function toast(message, type) {
   if (typeof window.toast === 'function') window.toast(message, type);
 }
 
+/**
+ * Pindah halaman tanpa import melingkar ke main.js.
+ * main.js mendengarkan event `app:navigate`.
+ */
+export function navigate(route) {
+  window.dispatchEvent(new CustomEvent('app:navigate', { detail: { route } }));
+}
+
 /** Progress bar mini (persentase). */
 export function progressBar(current, total) {
   const pct = total > 0 ? Math.min(100, Math.max(0, Math.round((current / total) * 100))) : 0;

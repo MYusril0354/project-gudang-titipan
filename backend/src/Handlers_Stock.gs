@@ -51,13 +51,28 @@ function stockDataset_() {
   });
 
   var receiptsById = {};
-  receipts.forEach(function (r) { receiptsById[String(r.id)] = r; });
+  var receiptsByLine = {};
+  receipts.forEach(function (r) {
+    receiptsById[String(r.id)] = r;
+    var kl = String(r.sj_line_id);
+    if (!receiptsByLine[kl]) receiptsByLine[kl] = [];
+    receiptsByLine[kl].push(r);
+  });
+
+  var sjs = readTable_('sj');
+  var sjLines = readTable_('sj_lines');
 
   var linesById = {};
-  readTable_('sj_lines').forEach(function (l) { linesById[String(l.id)] = l; });
+  var sjLinesByNo = {};
+  sjLines.forEach(function (l) {
+    linesById[String(l.id)] = l;
+    var k = String(l.sj_no);
+    if (!sjLinesByNo[k]) sjLinesByNo[k] = [];
+    sjLinesByNo[k].push(l);
+  });
 
   var sjByNo = {};
-  readTable_('sj').forEach(function (s) { sjByNo[String(s.no)] = s; });
+  sjs.forEach(function (s) { sjByNo[String(s.no)] = s; });
 
   var productsById = {};
   readTable_('products').forEach(function (p) { productsById[String(p.id)] = p; });
@@ -73,12 +88,17 @@ function stockDataset_() {
     consumptions: consumptions,
     shipments: shipments,
     shipmentLines: shipmentLines,
+    movements: readTable_('movements'),
+    sjs: sjs,
+    sjLines: sjLines,
     shipmentsByNo: shipmentsByNo,
     linesByNo: linesByNo,
     consumptionsByReceipt: consumptionsByReceipt,
     consumptionsByLine: consumptionsByLine,
     receiptsById: receiptsById,
+    receiptsByLine: receiptsByLine,
     linesById: linesById,
+    sjLinesByNo: sjLinesByNo,
     sjByNo: sjByNo,
     productsById: productsById,
     racksById: racksById,
