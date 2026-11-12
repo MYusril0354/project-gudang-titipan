@@ -244,19 +244,24 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Robot
 
 /* --- Tabel -> kartu bertumpuk (<=720px) ---
    Berlaku khusus tabel berkelas `tbl tbl-resp`; tiap sel membawa
-   `data-label` agar label kolom tetap tampil saat header disembunyikan. */
+   `data-label` agar label kolom tetap tampil saat header disembunyikan.
+   Layout blok (label di atas, nilai di bawah) agar sel dengan banyak
+   anak (mis. daftar receipt, nama+kode) tetap tersusun rapi. */
 @media(max-width:720px){
   .tbl-resp thead{display:none}
   .tbl-resp,.tbl-resp tbody,.tbl-resp tr,.tbl-resp td{display:block;width:100%}
-  .tbl-resp tr{padding:6px 14px;border-bottom:1px solid #f0f1f7}
+  .tbl-resp tr{padding:8px 14px;border-bottom:1px solid #f0f1f7}
   .tbl-resp tr:last-child{border-bottom:none}
-  .tbl-resp td{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
-    padding:7px 0;border:none;text-align:left}
+  .tbl-resp td{padding:7px 0;border:none;text-align:left}
   .tbl-resp td.num{text-align:left}
-  .tbl-resp td::before{content:attr(data-label);flex:none;font-size:10.5px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.5px;color:#8a90a6;padding-top:2px}
+  .tbl-resp td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.5px;color:#8a90a6;margin-bottom:3px}
   .tbl-resp td[data-label=""]::before{content:none}
-  .tbl-resp td[data-label=""]{justify-content:flex-end}
-  .tbl-resp td[data-label=""] .btn-group{width:100%;justify-content:flex-end}
+  .tbl-resp td[data-label=""] .btn-group{justify-content:flex-start}
   .tbl-resp td.tbl-idx{display:none}
 }
+
+/* --- Progress bar mini (diterima/qty) --- */
+.progress{height:6px;border-radius:999px;background:#eef0f5;overflow:hidden;
+  min-width:90px;max-width:170px;margin-top:4px}
+.progress > *{height:100%;background:var(--brand);border-radius:999px;transition:width .3s}

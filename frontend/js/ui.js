@@ -218,6 +218,33 @@ export function toast(message, type) {
   if (typeof window.toast === 'function') window.toast(message, type);
 }
 
+/** Progress bar mini (persentase). */
+export function progressBar(current, total) {
+  const pct = total > 0 ? Math.min(100, Math.max(0, Math.round((current / total) * 100))) : 0;
+  const bar = el('div', { class: 'progress' });
+  bar.appendChild(el('div', { style: { width: pct + '%' } }));
+  return bar;
+}
+
+/** Dialog konfirmasi (pengganti window.confirm). */
+export function confirmDialog(opts) {
+  const dlg = modal({
+    title: opts.title || 'Konfirmasi',
+    sub: opts.message || '',
+    footer: [
+      btn('Batal', { onClick: () => dlg.close() }),
+      btn(opts.confirmText || 'OK', {
+        variant: opts.danger ? 'danger' : 'primary',
+        onClick: () => {
+          dlg.close();
+          if (typeof opts.onConfirm === 'function') opts.onConfirm();
+        }
+      })
+    ]
+  });
+  return dlg;
+}
+
 /** Modal generik. Mengembalikan { close }. */
 export function modal(opts) {
   const root = document.getElementById('modalRoot');

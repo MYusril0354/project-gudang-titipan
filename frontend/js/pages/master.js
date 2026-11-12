@@ -10,6 +10,7 @@
 import { CONFIG } from '../config.js';
 import { master } from '../api.js';
 import { state, notify, setMaster } from '../state.js';
+import { confirmDialog } from '../ui.js';
 
 const ENTITIES = {
   product: {
@@ -245,16 +246,23 @@ function buildTable(items, conf) {
   return box;
 }
 
-async function confirmDelete(item, conf) {
+function confirmDelete(item, conf) {
   const label = item.code || item.name || item.id;
-  if (!window.confirm(`Hapus ${conf.label.toLowerCase()} "${label}"?`)) return;
-  try {
-    await master.remove(activeTab, item.id);
-    await refreshAfterMutation();
-    window.toast?.(`${conf.label} dihapus`, 'ok');
-  } catch (err) {
-    window.toast?.(err.message || 'Gagal menghapus', 'err');
-  }
+  confirmDialog({
+    title: `Hapus ${conf.label}?`,
+    message: `Hapus "${label}"? Data yang sudah dipakai transaksi ditolak server (amat aman), master yang bersih akan langsung terhapus.`,
+    confirmText: 'Hapus',
+    danger: true,
+    onConfirm: async () => {
+      try {
+        await master.remove(activeTab, item.id);
+        await refreshAfterMutation();
+        window.toast?.(`${conf.label} dihapus`, 'ok');
+      } catch (err) {
+        window.toast?.(err.message || 'Gagal menghapus', 'err');
+      }
+    }
+  });
 }
 
 /* =========================================================

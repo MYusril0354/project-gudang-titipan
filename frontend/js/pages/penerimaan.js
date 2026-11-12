@@ -14,7 +14,7 @@ import { sj } from '../api.js';
 import { state, fmt, fmtDate, STATUS_META } from '../state.js';
 import {
   el, btn, badge, panel, callout, emptyBox, skeleton, errorBox,
-  searchInput, toast, sub, kodeTag, rakTag, batchTag
+  searchInput, toast, sub, kodeTag, rakTag, batchTag, progressBar
 } from '../ui.js';import { openCreateSJ } from '../modals/sj-create.js';
 import { openReceive, openWait, openCancel } from '../modals/sj.js';
 
@@ -146,8 +146,14 @@ function buildLineRow(sjItem, line) {
     sub(line.unit)
   ]);
 
-  // Diterima + daftar batch
-  const receivedCell = el('td', { class: 'num', 'data-label': 'Diterima' }, [document.createTextNode(fmt(line.qtyReceived))]);
+  // Diterima + progress + daftar batch
+  const receivedCell = el('td', { class: 'num', 'data-label': 'Diterima' });
+  const recvTop = el('div', {}, [
+    el('b', { text: fmt(line.qtyReceived) }),
+    el('span', { class: 'sub', text: ` / ${fmt(line.qtySj)} ${line.unit}` })
+  ]);
+  receivedCell.appendChild(recvTop);
+  if (line.qtySj > 0) receivedCell.appendChild(progressBar(line.qtyReceived, line.qtySj));
   for (const r of line.receipts) {
     receivedCell.appendChild(el('div', { class: 'sub', style: { marginTop: '4px' } }, [
       batchTag(r.batchNumber),
