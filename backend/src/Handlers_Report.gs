@@ -15,7 +15,9 @@ function systemBootstrap_(params, ctx) {
     constants: {
       alasan: ALASAN_,
       satuan: SATUAN_,
-      role: ROLES
+      role: ROLES,
+      kondisi: KONDISI_,
+      cancelReasons: CANCEL_REASONS_
     },
     serverDate: todayStr_(),
     company: getCompany_(),

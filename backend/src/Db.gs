@@ -39,6 +39,39 @@ var HEADERS_ = {
   error_log: ['id', 'timestamp', 'code', 'message', 'stack', 'request']
 };
 
+/**
+ * Kolom tanggal (YYYY-MM-DD) per tabel.
+ * Wajib: Sheets menyimpan sel sebagai Date, bukan string.
+ */
+var DATE_COLS_ = {
+  sj: ['date'],
+  sj_lines: ['eta'],
+  receipts: ['date'],
+  cancellations: ['date'],
+  shipments: ['date', 'pod_date'],
+  movements: ['date']
+};
+
+/** Kolom timestamp (YYYY-MM-DD HH:mm:ss) per tabel. */
+var STAMP_COLS_ = {
+  users: ['created_at', 'updated_at', 'locked_until'],
+  sessions: ['expires_at', 'created_at'],
+  products: ['created_at', 'updated_at'],
+  customers: ['created_at', 'updated_at'],
+  locations: ['created_at', 'updated_at'],
+  racks: ['created_at', 'updated_at'],
+  sj: ['created_at', 'updated_at'],
+  sj_lines: ['created_at', 'updated_at'],
+  receipts: ['created_at', 'updated_at'],
+  cancellations: ['created_at', 'updated_at'],
+  shipments: ['created_at', 'updated_at', 'last_printed_at'],
+  shipment_lines: ['created_at', 'updated_at'],
+  shipment_consumptions: ['created_at'],
+  movements: ['created_at'],
+  audit_log: ['timestamp'],
+  error_log: ['timestamp']
+};
+
 /** Workbook database aktif. */
 function db_() {
   var id = PropertiesService.getScriptProperties().getProperty(PROP_SPREADSHEET_ID);
@@ -86,6 +119,8 @@ function readTable_(name) {
   if (lastRow < 2) return [];
 
   var values = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  var dateCols = DATE_COLS_[name] || [];
+  var stampCols = STAMP_COLS_[name] || [];
   var rows = [];
   for (var r = 0; r < values.length; r++) {
     var obj = {};
@@ -95,7 +130,11 @@ function readTable_(name) {
       obj[headers[c]] = v;
       if (v !== '' && v !== null && v !== undefined) hasValue = true;
     }
-    if (hasValue) rows.push(obj);
+    if (hasValue) {
+      for (var d = 0; d < dateCols.length; d++) obj[dateCols[d]] = cellDate_(obj[dateCols[d]]);
+      for (var t = 0; t < stampCols.length; t++) obj[stampCols[t]] = cellStamp_(obj[stampCols[t]]);
+      rows.push(obj);
+    }
   }
   return rows;
 }

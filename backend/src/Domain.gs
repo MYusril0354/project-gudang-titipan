@@ -35,13 +35,19 @@ function lineStatus_(line, receipts) {
 }
 
 /**
- * Status SJ (PRD 6.1):
+ * Status SJ dari daftar status baris (PRD 6.1):
  *  - RECEIVED bila semua baris RECEIVED/CANCELLED
  *  - WAITING_PHYSICAL bila ada baris WAITING_PHYSICAL/PARTIALLY_RECEIVED
  *  - selain itu OPEN
  */
 function sjStatus_(lines) {
-  var st = lines.map(function (l) { return lineStatus_(l, l.receipts); });
+  return sjStatusOfStatuses_(lines.map(function (l) { return lineStatus_(l, l.receipts); }));
+}
+
+/** Versi yang menerima status baris yang sudah dihitung (hindari hitung ulang). */
+function sjStatusOfStatuses_(statuses) {
+  var st = statuses || [];
+  if (!st.length) return 'OPEN';
   var allDone = st.every(function (x) { return x === 'RECEIVED' || x === 'CANCELLED'; });
   if (allDone) return 'RECEIVED';
   var anyWaiting = st.some(function (x) { return x === 'WAITING_PHYSICAL' || x === 'PARTIALLY_RECEIVED'; });

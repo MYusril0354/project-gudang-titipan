@@ -13,6 +13,9 @@ import { CONFIG } from './config.js';
 import { clearSession, getToken, auth, system } from './api.js';
 import { state, applyBootstrap, fmtDate } from './state.js';
 import { renderMasterPage } from './pages/master.js';
+import { renderPenerimaanPage } from './pages/penerimaan.js';
+import { renderPendingPage } from './pages/pending.js';
+import { el } from './ui.js';
 
 /* =========================================================
    Definisi halaman & hak akses tampilan
@@ -133,23 +136,31 @@ async function renderRoute(route) {
     await renderMasterPage(view, { tab: state.masterTab });
     return;
   }
+  if (route === 'penerimaan') {
+    await renderPenerimaanPage(view);
+    return;
+  }
+  if (route === 'pending') {
+    await renderPendingPage(view);
+    return;
+  }
 
   // Placeholder untuk halaman yang belum diimplementasikan.
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  const body = document.createElement('div');
-  body.className = 'panel-body';
-  body.style.padding = '28px';
-  const title = document.createElement('div');
-  title.className = 'panel-title';
-  title.textContent = page.label;
-  const note = document.createElement('div');
-  note.className = 'panel-sub';
-  note.style.marginTop = '6px';
-  note.textContent = 'Halaman ini belum diimplementasikan. Menunggu fase pengembangan berikutnya.';
-  body.append(title, note);
-  panel.appendChild(body);
-  view.appendChild(panel);
+  view.appendChild(buildPlaceholder(page));
+}
+
+/** Placeholder halaman yang belum diimplementasikan. */
+function buildPlaceholder(page) {
+  return el('div', { class: 'panel' }, [
+    el('div', { class: 'panel-body', style: { padding: '28px' } }, [
+      el('div', { class: 'panel-title', text: page.label }),
+      el('div', {
+        class: 'panel-sub',
+        style: { marginTop: '6px' },
+        text: 'Halaman ini belum diimplementasikan. Menunggu fase pengembangan berikutnya.'
+      })
+    ])
+  ]);
 }
 
 /** Tampilkan kegagalan bootstrap (mis. URL API belum diisi). */

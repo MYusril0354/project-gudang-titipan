@@ -46,6 +46,40 @@ function assertRequired_(value, field, label) {
   return value;
 }
 
+/* =========================================================
+   NORMALISASI SEL TANGGAL
+   Google Sheets mengubah string "2026-11-11" / "2026-11-11 08:30:00"
+   menjadi objek Date. Bila dikirim apa adanya ke frontend, JSON-nya
+   menjadi "2026-11-11T01:00:00.000Z" (UTC) sehingga tanggal bisa
+   bergeser sehari dan perbandingan teks (mis. masa berlaku sesi) rusak.
+   Semua tanggal dinormalisasi ke format kanonik aplikasi.
+   ========================================================= */
+
+/** Sel tanggal -> 'YYYY-MM-DD' (string kosong bila sel kosong). */
+function cellDate_(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, TZ_, 'yyyy-MM-dd');
+  }
+  var s = String(v).trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? s : Utilities.formatDate(d, TZ_, 'yyyy-MM-dd');
+}
+
+/** Sel timestamp -> 'YYYY-MM-DD HH:mm:ss' (string kosong bila sel kosong). */
+function cellStamp_(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, TZ_, 'yyyy-MM-dd HH:mm:ss');
+  }
+  var s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) return s;
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? s : Utilities.formatDate(d, TZ_, 'yyyy-MM-dd HH:mm:ss');
+}
+
 /** Ambil nilai berikutnya dari tabel counter (key -> value) secara atomik. */
 function nextCounter_(key) {
   var current = Number(getCounter_(key) || 0) + 1;
