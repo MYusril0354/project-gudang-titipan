@@ -2,8 +2,8 @@
 
 Aplikasi monitoring **gudang titipan**: melacak barang yang sudah dipotong stoknya oleh Surat Jalan (SJ) tetapi **fisiknya belum diterima** di gudang titipan pelanggan, mengelola stok titipan per batch, membuat pengiriman keluar dengan jejak batch, serta menyediakan kartu stock dan laporan rekonsiliasi.
 
-> Status: **Fase 2 — SJ & Penerimaan**. Backend `sj.*` + `pending.list` selesai,
-> frontend halaman **Penerimaan SJ** dan **Fisik Belum Ada** aktif.
+> Status: **Fase 3 — Stok & Pengiriman**. Alur lengkap SJ → penerimaan fisik →
+> stok per batch → pengiriman keluar (+ POD, void, cetak) sudah berjalan.
 
 ---
 
@@ -72,8 +72,9 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 │       ├── state.js           # state + cache master data
 │       ├── main.js            # navigasi + bootstrap
 │       ├── login.js           # logika halaman login
-│       ├── pages/*.js
-│       ├── modals/*.js
+│       ├── ui.js              # helper DOM (ikon SVG, modal, progress, tabel)
+│       ├── pages/*.js         # master, penerimaan, pending, stok, pengiriman
+│       ├── modals/*.js        # sj, sj-create, shipment
 │       └── print.js
 └── docs/
     ├── API.md                 # kontrak REST API
@@ -86,7 +87,7 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 | Item | Nilai |
 | --- | --- |
 | Proyek Apps Script | Gudang Titipan API |
-| Deployment | Web App v15 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
+| Deployment | Web App v20 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
 | Spreadsheet database | `database_gudang_titipan` (17 tabel) |
 | Zona waktu | `Asia/Jakarta` |
 | Endpoint | URL `/exec` sudah diisi di [frontend/js/config.js](frontend/js/config.js) |
@@ -156,9 +157,9 @@ Daftar lengkap action ada di [docs/API.md](docs/API.md).
 | **0. Fondasi** | Spreadsheet + sheet, proyek GAS, router, envelope, health, helper Db, deployment DEV | Frontend bisa memanggil `health` tanpa CORS error |
 | **1. Auth & master** | `auth.*`, `users`, RBAC, `system.bootstrap`, CRUD master | Login + Master Data end-to-end |
 | **2. SJ & penerimaan** | `sj.*`, `pending.list`, counter, batch suggestion, receipts, cancellations | ✅ Alur SJ → Fisik Ada / Belum Ada / Batalkan berjalan end-to-end |
-| **3. Stok & pengiriman** | `stock.*`, `shipment.*`, consumption, movements, lock, POD, void, cetak | Alur pengiriman lengkap + cetak |
-| **4. Laporan** | `dashboard.summary`, `ledger.kartuStock`, `report.reconciliation` | Semua halaman pakai data nyata |
-| **5. Hardening & rilis** | Audit log, backup harian, error log, header keamanan, impor CSV, UAT, PROD | Go-live |
+| **3. Stok & pengiriman** | `stock.*`, `shipment.*`, consumption, movements, lock, POD, void, cetak | ✅ Stok per batch + pengiriman, POD, void, cetak berjalan |
+| **4. Laporan** | `dashboard.summary`, `ledger.kartuStock`, `report.reconciliation` | Belum |
+| **5. Hardening & rilis** | Audit log, backup harian, error log, header keamanan, impor CSV, UAT, PROD | Belum |
 
 ## 8. Dokumen
 

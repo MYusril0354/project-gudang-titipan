@@ -103,3 +103,73 @@ Satu-satunya action yang juga menerima `GET`: `GET {GAS_EXEC_URL}?action=system.
 ## 4. Paginasi
 
 Daftar besar mendukung `page`, `pageSize` (default 50), `q` (pencarian), dan filter spesifik per action (mis. `status`, `customerId`, `from`, `to`).
+
+## 5. Kontrak Stok & Pengiriman (Fase 3)
+
+Satu **batch** = satu baris `receipts` (setiap penerimaan fisik membuat satu batch).
+Karena itu `id` batch = `id` receipt, dan sisa batch selalu dihitung
+`qty receipt − Σ shipment_consumptions` pengiriman non-DRAFT/non-VOID.
+
+### `stock.list`
+
+```json
+{ "action": "stock.list", "params": { "q": "", "customerId": "", "includeEmpty": false } }
+```
+
+Balasan: `{ items[], perCustomer[], totals:{batches,qty,customers} }`.
+Tiap item: `{ id, batchNumber, date, qtyIn, available, kondisi, rackId, rackCode,
+productId, productCode, productName, unit, sjNo, customerId, customerName }`.
+
+### `stock.available`
+
+```json
+{ "action": "stock.available", "params": { "customerId": "<id>" } }
+```
+
+Balasan: `{ customerId, items[], totals:{batches,qty} }` — hanya batch bersisa > 0.
+
+### `shipment.create`
+
+```json
+{ "action": "shipment.create", "params": {
+  "date": "2026-11-12", "customerId": "<id>",
+  "driver": "Budi", "vehicle": "B 1234 XY", "note": "",
+  "lines": [ { "productId": "<id>", "receiptId": "<id batch>", "rackId": "<id rak>", "qty": 30 } ] } }
+```
+
+Nomor `DO-TTR-{urut 3}` diambil dari counter terpisah. Status langsung `SHIPPED`
+(langsung memotong stok). Validasi stok **diulang di server di dalam lock** dan
+mengakumulasi baris yang memakai batch sama.
+
+Error: `INSUFFICIENT_STOCK` (qty > sisa), `VALIDATION_ERROR` (batch bukan milik
+pelanggan / produk tidak cocok), `NOT_FOUND` (batch hilang).
+
+### `shipment.markDelivered`
+
+```json
+{ "action": "shipment.markDelivered", "params": { "no": "DO-TTR-001", "podDate": "2026-11-13" } }
+```
+
+`podDate` opsional (default hari ini) dan tidak boleh sebelum tanggal kirim.
+Pengiriman `VOID` ditolak; yang sudah `DELIVERED` dikembalikan apa adanya.
+
+### `shipment.printData`
+
+```json
+{ "action": "shipment.printData", "params": { "no": "DO-TTR-001" } }
+```
+
+Menaikkan `print_count` + menyimpan `last_printed_at`. Balasan berisi
+`no, date, customerId, customer{name,address,phone}, driver, vehicle, note,
+status, podDate, printCount, lines[{productId,rackId,qty,batchNumber,sjNo}],
+company{}` — dipakai `frontend/js/print.js`. Pengiriman `VOID` ditolak.
+
+### `shipment.void`
+
+```json
+{ "action": "shipment.void", "params": { "no": "DO-TTR-001", "reason": "salah input qty" } }
+```
+
+ADMIN saja, `reason` wajib. Status menjadi `VOID`; stok kembali otomatis karena
+pengiriman VOID diabaikan saat menghitung sisa batch, dan dicatat mutasi
+`VOID_OUT` (+qty) untuk jejak kartu stock.

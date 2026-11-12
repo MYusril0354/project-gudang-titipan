@@ -299,6 +299,7 @@ export function select(options, value, opts = {}) {
       value: isObj ? o.value : o,
       text: isObj ? o.label : String(o)
     });
+    if (isObj && o.disabled) opt.disabled = true;
     if (String(opt.value) === String(value)) opt.selected = true;
     sel.appendChild(opt);
   }

@@ -29,7 +29,9 @@ export const state = {
     penerimaan: '',
     pending: '',
     stok: '',
+    stokCustomer: '',
     pengiriman: '',
+    pengirimanStatus: '',
     kartu: { code: '', batch: '', customer: '', from: '', to: '' }
   }
 };

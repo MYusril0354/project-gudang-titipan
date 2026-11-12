@@ -16,19 +16,31 @@ import { state, fmt, fmtDate, findProduct, findCustomer, findRack } from './stat
 
 /**
  * Cetak Surat Jalan untuk satu nomor pengiriman.
+ *
+ * Urutan penting: jendela dibuka SINKRON di dalam handler klik (agar tidak
+ * diblokir popup blocker) SEBELUM memanggil server. Dengan begitu, bila popup
+ * diblokir, `print_count` tidak ikut naik (server hanya menambah saat data
+ * cetak benar-benar diminta).
+ *
  * @param {string} no nomor DO, mis. 'DO-TTR-001'
  */
 export async function printSuratJalan(no) {
-  // Server menaikkan print_count saat data cetak diminta.
-  const data = await shipment.printData(no);
   const win = window.open('', '_blank');
   if (!win) {
     throw new Error('Jendela cetak diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
   }
-  win.document.write(buildDocument(data));
-  win.document.close();
-  win.focus();
-  win.print();
+
+  try {
+    // Server menaikkan print_count saat data cetak diminta.
+    const data = await shipment.printData(no);
+    win.document.write(buildDocument(data));
+    win.document.close();
+    win.focus();
+    win.print();
+  } catch (err) {
+    try { win.close(); } catch (ignore) { /* jendela mungkin sudah tertutup */ }
+    throw err;
+  }
 }
 
 /**
@@ -98,6 +110,49 @@ function setText(doc, selector, value) {
 
 /** Kerangka dokumen cetak (tanpa data dinamis — aman dari XSS). */
 const PRINT_TEMPLATE = `
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #000;
+    font-size: 10.5pt; line-height: 1.4; background: #fff; }
+  .sheet { max-width: 190mm; margin: 0 auto; padding: 8mm 0; }
+
+  .kop { display: flex; align-items: center; gap: 14px; padding-bottom: 12px;
+    border-bottom: 3px double #000; margin-bottom: 18px; }
+  .kop-logo { width: 54px; height: 54px; border-radius: 10px; flex: none;
+    background: #4f46e5; color: #fff; display: flex; align-items: center;
+    justify-content: center; font-weight: 700; font-size: 18pt; }
+  .kop-text { flex: 1; min-width: 0; }
+  .kop-name { font-size: 15pt; font-weight: 700; }
+  .kop-line { font-size: 9pt; color: #444; }
+  .kop-title { text-align: right; flex: none; }
+  .kop-title h1 { margin: 0; font-size: 15pt; letter-spacing: 3px; }
+  .kop-no { font-family: 'Courier New', monospace; font-size: 11pt; font-weight: 700; }
+
+  .meta { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .meta > div { border: 1px solid #333; padding: 10px 12px; }
+  .meta-label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px;
+    color: #666; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 7px; }
+  .meta-strong { font-weight: 700; font-size: 11pt; }
+  .meta-line { font-size: 9.5pt; }
+
+  .doc-tbl { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .doc-tbl th { background: #f0f0f0; border: 1px solid #333; padding: 7px 5px;
+    font-size: 8pt; text-transform: uppercase; letter-spacing: .3px; text-align: left; }
+  .doc-tbl td { border: 1px solid #999; padding: 6px 5px; font-size: 9pt; vertical-align: top; }
+  .doc-tbl tfoot td { background: #f7f7f7; font-weight: 700; border-top: 2px solid #000; }
+
+  .doc-note { background: #f8f9ff; border-left: 3px solid #4f46e5;
+    padding: 10px 12px; font-size: 9.5pt; margin: 0 0 24px; }
+
+  .signs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    page-break-inside: avoid; }
+  .signs > div { text-align: center; font-size: 10pt; }
+  .sign-line { border-top: 1px solid #000; margin-top: 62px; padding-top: 6px; }
+  .sign-cap { font-size: 9.5pt; color: #333; }
+
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
 <div class="sheet">
   <header class="kop">
     <div class="kop-logo"></div>

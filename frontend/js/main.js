@@ -10,11 +10,13 @@
  */
 
 import { CONFIG } from './config.js';
-import { clearSession, getToken, auth, system, sj, pending } from './api.js';
+import { clearSession, getToken, auth, system, sj, pending, shipment } from './api.js';
 import { state, applyBootstrap, fmtDate } from './state.js';
 import { renderMasterPage } from './pages/master.js';
 import { renderPenerimaanPage } from './pages/penerimaan.js';
 import { renderPendingPage } from './pages/pending.js';
+import { renderStokPage } from './pages/stok.js';
+import { renderPengirimanPage } from './pages/pengiriman.js';
 import { el } from './ui.js';
 
 /* =========================================================
@@ -32,7 +34,7 @@ const PAGES = [
   { route: 'penerimaan', group: 'operasional', label: 'Penerimaan SJ', sub: 'Daftar Surat Jalan dan penerimaan fisik', roles: null, badgeKey: 'openSj' },
   { route: 'pending', group: 'operasional', label: 'Fisik Belum Ada', sub: 'Antrean barang yang fisiknya belum diterima', roles: null, badgeKey: 'pendingLines' },
   { route: 'stok', group: 'operasional', label: 'Stok Titipan', sub: 'Posisi stok per batch', roles: null },
-  { route: 'pengiriman', group: 'operasional', label: 'Pengiriman', sub: 'Surat jalan keluar dari gudang titipan', roles: null },
+  { route: 'pengiriman', group: 'operasional', label: 'Pengiriman', sub: 'Surat jalan keluar dari gudang titipan', roles: null, badgeKey: 'awaitingPod' },
   { route: 'kartu', group: 'pelaporan', label: 'Kartu Stock', sub: 'Mutasi dan saldo berjalan per batch', roles: null },
   { route: 'laporan', group: 'pelaporan', label: 'Rekonsiliasi', sub: 'Total masuk, keluar, stok, dan selisih', roles: null },
   { route: 'master', group: 'admin', label: 'Master Data', sub: 'Produk, pelanggan, gudang, dan rak', roles: null },
@@ -41,7 +43,7 @@ const PAGES = [
 ];
 
 /** Angka kecil di daftar menu (diisi setelah bootstrap, non-blocking). */
-let navBadges = { openSj: 0, pendingLines: 0 };
+let navBadges = { openSj: 0, pendingLines: 0, awaitingPod: 0 };
 
 const ICONS = {
   dashboard: '<path d="M3 13h8V3H3zM13 21h8v-8h-8zM13 3v6h8V3zM3 21h8v-4H3z"/>',
@@ -178,16 +180,18 @@ function renderNav() {
   }
 }
 
-/** Ambil angka menu (pending baris + SJ terbuka) tanpa memblokir render. */
+/** Ambil angka menu (pending baris, SJ terbuka, menunggu POD) tanpa memblokir render. */
 async function loadBadges() {
   try {
-    const [sjRes, pendingRes] = await Promise.all([
+    const [sjRes, pendingRes, shipRes] = await Promise.all([
       sj.list({}),
-      pending.list({})
+      pending.list({}),
+      shipment.list({})
     ]);
     navBadges.openSj = (sjRes.counts && sjRes.counts.open) || 0;
     navBadges.pendingLines = ((pendingRes.totals && pendingRes.totals.rows) || 0)
       + ((pendingRes.totals && pendingRes.totals.openRows) || 0);
+    navBadges.awaitingPod = (shipRes.counts && shipRes.counts.shipped) || 0;
     renderNav();
   } catch (ignore) { /* angka menu bersifat opsional */ }
 }
@@ -221,6 +225,14 @@ async function renderRoute(route) {
   }
   if (route === 'pending') {
     await renderPendingPage(view);
+    return;
+  }
+  if (route === 'stok') {
+    await renderStokPage(view);
+    return;
+  }
+  if (route === 'pengiriman') {
+    await renderPengirimanPage(view);
     return;
   }
 

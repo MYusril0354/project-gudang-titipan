@@ -110,6 +110,13 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Robot
 .sj-no{font-weight:700;font-size:14px;letter-spacing:-.2px}
 .sj-meta{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:14px;flex-wrap:wrap}
 .sj-meta span b{color:#3c4358;font-weight:650}
+.head-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sisa-ok{color:var(--green)}
+.cust-summary{display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;background:#fafbff;border-bottom:1px solid var(--line)}
+.cust-chip{display:flex;align-items:baseline;gap:8px;background:#fff;border:1px solid var(--line);
+  border-radius:999px;padding:6px 13px;font-size:12.5px}
+.cust-chip-name{color:var(--muted);font-size:11.5px;font-weight:650;max-width:200px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .modal-backdrop{position:fixed;inset:0;background:rgba(16,21,38,.55);display:grid;place-items:center;padding:20px;z-index:100;animation:fade .15s}
 .modal{background:#fff;border-radius:16px;width:100%;max-width:680px;box-shadow:0 24px 60px rgba(16,21,38,.3);animation:pop .18s ease-out;max-height:92vh;display:flex;flex-direction:column}
 .modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
@@ -133,6 +140,18 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Robot
 .addline-title{font-size:11.5px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
 .inline-input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:12.5px;background:#fff;color:var(--ink);outline:none;width:100%}
 .inline-input:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+
+/* Baris dinamis pada modal pengiriman */
+.row-between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ship-line{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eef0f5}
+.ship-line:last-child{border-bottom:none}
+.ship-line-main{flex:1;min-width:0}
+.ship-line-main select{width:100%}
+.ship-line-side{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap}
+@media(max-width:720px){
+  .ship-line{flex-direction:column;align-items:stretch}
+  .ship-line-side{justify-content:flex-start}
+}
 .ks-form{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 @media(max-width:900px){.ks-form{grid-template-columns:1fr 1fr}}
 .ks-tbl tbody tr.batch-start td{border-top:2px solid #cbd5e1}
