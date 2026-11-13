@@ -11,6 +11,7 @@ import { CONFIG } from '../config.js';
 import { master } from '../api.js';
 import { state, notify, setMaster } from '../state.js';
 import { confirmDialog } from '../ui.js';
+import { openImportCsv } from '../modals/import.js';
 
 const ENTITIES = {
   product: {
@@ -100,6 +101,15 @@ export async function renderMasterPage(view, route) {
 
   const actionWrap = document.createElement('div');
   actionWrap.className = 'panel-actions';
+
+  const importBtn = document.createElement('button');
+  importBtn.className = 'btn';
+  importBtn.type = 'button';
+  importBtn.textContent = 'Impor CSV';
+  importBtn.title = 'Impor data master dari berkas CSV (migrasi data awal)';
+  importBtn.addEventListener('click', () => openImportCsv(activeTab, refreshAfterMutation));
+  actionWrap.appendChild(importBtn);
+
   const addBtn = document.createElement('button');
   addBtn.className = 'btn btn-primary';
   addBtn.type = 'button';

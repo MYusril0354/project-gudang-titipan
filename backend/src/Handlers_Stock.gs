@@ -14,8 +14,13 @@
 /**
  * Muat seluruh data yang dibutuhkan perhitungan stok dalam satu request.
  * Tiap tabel dibaca SATU kali (PRD 13: kinerja).
+ *
+ * @param {{withMovements?: boolean}} [opts] `movements` hanya dibaca bila
+ *   diminta — dashboard dan pengiriman tidak memakainya, jadi tidak perlu
+ *   membayar satu getValues ekstra.
  */
-function stockDataset_() {
+function stockDataset_(opts) {
+  var wantMovements = Boolean(opts && opts.withMovements);
   var receipts = readTable_('receipts');
   var consumptions = readTable_('shipment_consumptions');
   var shipments = readTable_('shipments');
@@ -88,7 +93,7 @@ function stockDataset_() {
     consumptions: consumptions,
     shipments: shipments,
     shipmentLines: shipmentLines,
-    movements: readTable_('movements'),
+    movements: wantMovements ? readTable_('movements') : [],
     sjs: sjs,
     sjLines: sjLines,
     shipmentsByNo: shipmentsByNo,

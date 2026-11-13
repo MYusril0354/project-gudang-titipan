@@ -72,17 +72,54 @@ var STAMP_COLS_ = {
   error_log: ['timestamp']
 };
 
-/** Workbook database aktif. */
-function db_() {
-  var id = PropertiesService.getScriptProperties().getProperty(PROP_SPREADSHEET_ID);
-  if (!id) throw apiError_('INTERNAL', 'SPREADSHEET_ID belum diset di Script Properties.');
-  return SpreadsheetApp.openById(id);
+/**
+ * Cache per-eksekusi (variabel global hanya hidup selama satu request GAS).
+ * Memangkas panggilan SpreadsheetApp.openById / getSheetByName yang tadinya
+ * dilakukan ulang di setiap helper. Cache baris diinvalidasi setiap ada tulis.
+ */
+var SS_CACHE_ = null;
+var SHEET_CACHE_ = {};
+var READ_CACHE_ = {};
+
+/**
+ * CATATAN KINERJA (Fase 5) — hasil percobaan, jangan diulang tanpa alasan:
+ *
+ * Sempat dicoba prefetch semua tabel lewat satu panggilan Sheets API
+ * (`values:batchGet` + UrlFetchApp) untuk menukar N round-trip `getValues()`
+ * menjadi satu. Hasil pengukuran: TIDAK lebih cepat (bootstrap p50 3,5 -> 4,0
+ * dtk; dashboard 3,9 -> 4,1 dtk), kemungkinan karena biaya OAuth token +
+ * round-trip HTTPS menyamai atau melebihi penghematan `getValues`. Perubahan
+ * itu dicabut.
+ *
+ * Yang TERBUKTI membantu adalah cache per-eksekusi di bawah ini (sheet object
+ * dan baris tabel): bootstrap -17%, dashboard -27%.
+ *
+ * Batas bawah latensi ada di platform: `system.health` (tanpa akses sheet sama
+ * sekali) sudah ~1,7 dtk. Untuk turun ke target PRD 0,5-2 dtk pada endpoint
+ * multi-tabel, datastore harus dipindah dari Sheets (lihat RISK di RUNBOOK).
+ */
+
+/** Kosongkan cache baris setelah tulis (semua tulis lewat helper di bawah). */
+function invalidateReadCache_(table) {
+  if (table) delete READ_CACHE_[table];
+  else READ_CACHE_ = {};
 }
 
-/** Sheet berdasarkan nama, dibuat beserta header bila belum ada. */
+/** Workbook database aktif (di-cache per request). */
+function db_() {
+  if (SS_CACHE_) return SS_CACHE_;
+  var id = PropertiesService.getScriptProperties().getProperty(PROP_SPREADSHEET_ID);
+  if (!id) throw apiError_('INTERNAL', 'SPREADSHEET_ID belum diset di Script Properties.');
+  SS_CACHE_ = SpreadsheetApp.openById(id);
+  return SS_CACHE_;
+}
+
+/** Sheet berdasarkan nama, dibuat beserta header bila belum ada (di-cache). */
 function sheet_(name) {
   var headers = HEADERS_[name];
   if (!headers) throw apiError_('INTERNAL', 'Tabel tidak dikenal: ' + name);
+
+  if (SHEET_CACHE_[name]) return SHEET_CACHE_[name];
 
   var ss = db_();
   var sh = ss.getSheetByName(name);
@@ -91,6 +128,7 @@ function sheet_(name) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
     sh.setFrozenRows(1);
   }
+  SHEET_CACHE_[name] = sh;
   return sh;
 }
 
@@ -107,6 +145,7 @@ function ensureAllTables_() {
 
 /**
  * Baca seluruh tabel menjadi array objek (satu getValues per tabel).
+ * Hasil di-cache per request; cache dibuang setiap ada operasi tulis.
  * @param {string} name nama sheet
  * @returns {Object[]}
  */
@@ -114,9 +153,14 @@ function readTable_(name) {
   var headers = HEADERS_[name];
   if (!headers) throw apiError_('INTERNAL', 'Tabel tidak dikenal: ' + name);
 
+  if (READ_CACHE_[name]) return READ_CACHE_[name];
+
   var sh = sheet_(name);
   var lastRow = sh.getLastRow();
-  if (lastRow < 2) return [];
+  if (lastRow < 2) {
+    READ_CACHE_[name] = [];
+    return READ_CACHE_[name];
+  }
 
   var values = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
   var dateCols = DATE_COLS_[name] || [];
@@ -136,6 +180,7 @@ function readTable_(name) {
       rows.push(obj);
     }
   }
+  READ_CACHE_[name] = rows;
   return rows;
 }
 
@@ -178,6 +223,7 @@ function appendRow_(name, obj) {
     return v === undefined || v === null ? '' : v;
   });
   sh.appendRow(row);
+  invalidateReadCache_(name);
   return obj;
 }
 
@@ -197,6 +243,7 @@ function appendRows_(name, objs) {
 
   var sh = sheet_(name);
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+  invalidateReadCache_(name);
   return objs;
 }
 
@@ -214,7 +261,6 @@ function updateById_(name, key, patch) {
   var headers = HEADERS_[name];
   var sh = sheet_(name);
   var current = sh.getRange(idx, 1, 1, headers.length).getValues()[0];
-  var updated = Object.assign({}, patch);
 
   Object.keys(patch).forEach(function (col) {
     var c = headers.indexOf(col);
@@ -222,6 +268,7 @@ function updateById_(name, key, patch) {
   });
 
   sh.getRange(idx, 1, 1, headers.length).setValues([current]);
+  invalidateReadCache_(name);
   return current;
 }
 
@@ -230,6 +277,7 @@ function deleteById_(name, key) {
   var idx = rowIndexByKey_(name, key);
   if (idx === -1) return false;
   sheet_(name).deleteRow(idx);
+  invalidateReadCache_(name);
   return true;
 }
 
@@ -255,6 +303,7 @@ function setCounter_(key, value) {
   } else {
     sh.getRange(idx, 2).setValue(value);
   }
+  invalidateReadCache_('counters');
   return value;
 }
 

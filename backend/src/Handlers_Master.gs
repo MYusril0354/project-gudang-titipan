@@ -264,3 +264,246 @@ function masterDelete_(params, ctx) {
   audit_(ctx, 'master.delete', entity, id, { name: found[0].name || found[0].code || id });
   return { deleted: true, id: id };
 }
+
+/* =========================================================
+   IMPOR CSV (Fase 5 — migrasi data awal)
+   ========================================================= */
+
+/** Batas baris per impor. */
+var IMPORT_MAX_ROWS = 500;
+
+/** Urutan kolom bila CSV tidak menyertakan baris header. */
+var IMPORT_ORDER_ = {
+  product: ['code', 'name', 'unit'],
+  customer: ['code', 'name', 'address', 'phone'],
+  location: ['type', 'name', 'customer'],
+  rack: ['code', 'name', 'location']
+};
+
+/** Nama kolom yang dikenali di baris header (Indonesia & Inggris). */
+var IMPORT_ALIASES_ = {
+  code: ['code', 'kode', 'kode produk', 'kode pelanggan', 'kode rak', 'kode gudang'],
+  name: ['name', 'nama', 'nama produk', 'nama pelanggan', 'nama gudang', 'nama rak'],
+  unit: ['unit', 'satuan'],
+  address: ['address', 'alamat'],
+  phone: ['phone', 'telepon', 'telp', 'no telepon', 'no. telepon'],
+  type: ['type', 'tipe', 'tipe gudang'],
+  customer: ['customer', 'customerid', 'customer id', 'pelanggan', 'kode pelanggan'],
+  // Gudang tidak punya kolom kode -> rujukan diisi NAMA gudang atau id.
+  location: ['location', 'locationid', 'location id', 'gudang', 'nama gudang', 'lokasi']
+};
+
+/**
+ * Urai teks CSV menjadi matriks sel (mendukung tanda kutip ganda).
+ * Pemisah dideteksi: ';' bila baris pertama memakai ';' tanpa ','.
+ */
+function parseCsv_(text) {
+  var s = String(text || '');
+  var firstLine = s.split(/\r?\n/)[0] || '';
+  var delim = (firstLine.indexOf(';') !== -1 && firstLine.indexOf(',') === -1) ? ';' : ',';
+
+  var rows = [];
+  var row = [];
+  var field = '';
+  var inQuotes = false;
+
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charAt(i);
+
+    if (inQuotes) {
+      if (ch === '"') {
+        if (s.charAt(i + 1) === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+
+    if (ch === '"') inQuotes = true;
+    else if (ch === delim) { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (ch === '\r') { /* abaikan */ }
+    else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+
+  return rows
+    .filter(function (r) {
+      return r.some(function (c) { return String(c).trim() !== ''; });
+    })
+    .map(function (r) {
+      return r.map(function (c) { return String(c).trim(); });
+    });
+}
+
+/** Cocokkan satu judul kolom ke nama field internal, atau null. */
+function importFieldOf_(title) {
+  var t = String(title || '').trim().toLowerCase();
+  var keys = Object.keys(IMPORT_ALIASES_);
+  for (var i = 0; i < keys.length; i++) {
+    if (IMPORT_ALIASES_[keys[i]].indexOf(t) !== -1) return keys[i];
+  }
+  return null;
+}
+
+/** Cari id berdasarkan kode (atau id) pada tabel master; '' bila tidak ada. */
+function resolveCodeToId_(table, value) {
+  var v = String(value || '').trim().toUpperCase();
+  if (!v) return '';
+  var rows = readTable_(table);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].id).toUpperCase() === v) return rows[i].id;
+    if (String(rows[i].code || '').toUpperCase() === v) return rows[i].id;
+  }
+  return '';
+}
+
+/**
+ * Cari id gudang dari rujukan di CSV.
+ * Tabel `locations` TIDAK punya kolom `code` (lihat HEADERS_), jadi rujukan
+ * dicocokkan ke `id` lalu ke `name` (tidak peka huruf besar/kecil).
+ */
+function resolveLocationRef_(value) {
+  var v = String(value || '').trim();
+  if (!v) return '';
+  var vu = v.toUpperCase();
+  var rows = readTable_('locations');
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].id).toUpperCase() === vu) return rows[i].id;
+  }
+  for (var j = 0; j < rows.length; j++) {
+    if (String(rows[j].name || '').trim().toUpperCase() === vu) return rows[j].id;
+  }
+  return '';
+}
+
+/**
+ * Impor master data dari teks CSV (PRD Fase 5: migrasi data awal).
+ *
+ * Menerima baris header opsional (nama kolom Indonesia/Inggris). Bila tidak ada
+ * header, urutan kolom mengikuti IMPORT_ORDER_[entity].
+ * Untuk `location`/`rack`, kolom customer/location diisi KODE dan diterjemahkan
+ * ke id. Validasi tiap baris memakai aturan yang sama dengan master.create.
+ *
+ * @param {Object} params { entity, csv }
+ * @returns {Object} ringkasan hasil per baris
+ */
+function masterImport_(params, ctx) {
+  var entity = params.entity;
+  var conf = masterConf_(entity);
+
+  var csv = String(params.csv || '');
+  if (!csv.trim()) {
+    throw apiError_('VALIDATION_ERROR', 'Isi CSV masih kosong.', 'csv');
+  }
+
+  var matrix = parseCsv_(csv);
+  if (!matrix.length) {
+    throw apiError_('VALIDATION_ERROR', 'Tidak ada baris data yang bisa dibaca.', 'csv');
+  }
+
+  // Deteksi header: baris pertama dianggap header bila ada kolom yang dikenali.
+  var headerFields = matrix[0].map(importFieldOf_);
+  var hasHeader = headerFields.some(function (f) { return f !== null; });
+
+  var fields;
+  var dataRows;
+  if (hasHeader) {
+    fields = headerFields;
+    dataRows = matrix.slice(1);
+  } else {
+    fields = IMPORT_ORDER_[entity];
+    dataRows = matrix;
+  }
+
+  if (!dataRows.length) {
+    throw apiError_('VALIDATION_ERROR', 'CSV hanya berisi baris header.', 'csv');
+  }
+  if (dataRows.length > IMPORT_MAX_ROWS) {
+    throw apiError_('VALIDATION_ERROR',
+      'Maksimal ' + IMPORT_MAX_ROWS + ' baris per impor (dikirim ' + dataRows.length + ').', 'csv');
+  }
+
+  var now = nowStamp_();
+  var created = 0;
+  var failed = 0;
+  var errors = [];
+
+  dataRows.forEach(function (cells, idx) {
+    var rowNo = (hasHeader ? idx + 2 : idx + 1);
+    var values = {};
+
+    if (hasHeader) {
+      for (var c = 0; c < fields.length; c++) {
+        if (!fields[c]) continue;
+        values[fields[c]] = cells[c] !== undefined ? cells[c] : '';
+      }
+    } else {
+      for (var d = 0; d < fields.length; d++) {
+        values[fields[d]] = cells[d] !== undefined ? cells[d] : '';
+      }
+    }
+
+    // Terjemahkan kode relasi menjadi id.
+    try {
+      if (entity === 'location' && values.customer !== undefined) {
+        if (String(values.customer).trim()) {
+          var cid = resolveCodeToId_('customers', values.customer);
+          if (!cid) {
+            throw apiError_('NOT_FOUND', 'Pelanggan dengan kode "' + values.customer + '" tidak ditemukan.', 'customerId');
+          }
+          values.customerId = cid;
+        }
+        delete values.customer;
+      }
+      if (entity === 'rack' && values.location !== undefined) {
+        if (String(values.location).trim()) {
+          var lid = resolveLocationRef_(values.location);
+          if (!lid) {
+            throw apiError_('NOT_FOUND',
+              'Gudang "' + values.location + '" tidak ditemukan (isi dengan NAMA gudang, karena gudang tidak punya kode).',
+              'locationId');
+          }
+          values.locationId = lid;
+        }
+        delete values.location;
+      }
+
+      var row = buildMasterRow_(entity, values, null);
+      row.id = newId_();
+      row.created_at = now;
+      row.created_by = ctx.username;
+      row.updated_at = now;
+      row.updated_by = ctx.username;
+
+      validateMaster_(entity, row, null);
+      appendRow_(conf.table, row);
+      created++;
+    } catch (rowErr) {
+      failed++;
+      if (errors.length < 50) {
+        errors.push({
+          row: rowNo,
+          code: rowErr.code || 'INTERNAL',
+          message: rowErr.message || 'Baris gagal diproses.',
+          field: rowErr.field || null
+        });
+      }
+    }
+  });
+
+  audit_(ctx, 'master.import', entity, '', {
+    rows: dataRows.length, created: created, failed: failed, header: hasHeader
+  });
+
+  return {
+    entity: entity,
+    headerDetected: hasHeader,
+    fields: hasHeader ? fields : IMPORT_ORDER_[entity],
+    rows: dataRows.length,
+    created: created,
+    failed: failed,
+    errors: errors
+  };
+}

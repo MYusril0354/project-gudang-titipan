@@ -171,7 +171,7 @@ function dashboardSummary_(params, ctx) {
  * @param {Object} params { productId, code, batch, customerId, from, to }
  */
 function ledgerKartuStock_(params, ctx) {
-  var ds = stockDataset_();
+  var ds = stockDataset_({ withMovements: true });
   var all = ds.movements.map(function (m) { return movementView_(m, ds); });
   sortMovements_(all);
 
@@ -247,7 +247,7 @@ function ledgerKartuStock_(params, ctx) {
  * dan ditampilkan sebagai `variance` (PRD: "Masuk − Keluar = Stok, tanpa selisih").
  */
 function reportReconciliation_(params, ctx) {
-  var ds = stockDataset_();
+  var ds = stockDataset_({ withMovements: true });
 
   var allMoves = ds.movements.map(function (m) { return movementView_(m, ds); });
   sortMovements_(allMoves);

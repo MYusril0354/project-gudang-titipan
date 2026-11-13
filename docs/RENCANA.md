@@ -1,6 +1,7 @@
 # Rencana Implementasi
 
-Status saat ini: **Fase 4 selesai** — seluruh halaman aplikasi memakai data nyata. Backend live **v24**.
+Status saat ini: **Fase 5 selesai** — aplikasi lengkap dan siap UAT. Backend live **v30**.
+Dokumen operasional: [RUNBOOK](RUNBOOK.md) · checklist [UAT](UAT.md).
 
 ## Ringkas Status
 
@@ -11,7 +12,43 @@ Status saat ini: **Fase 4 selesai** — seluruh halaman aplikasi memakai data ny
 | **2. SJ & penerimaan** | `sj.*`, `pending.list`, counter, batch suggestion, receipts, cancellations | ✅ Selesai |
 | **3. Stok & pengiriman** | `stock.*`, `shipment.*`, consumption, movements, lock, POD, void, cetak | ✅ Selesai |
 | **4. Laporan** | `dashboard.summary`, `ledger.kartuStock`, `report.reconciliation`, `user.*`, `audit.list` | ✅ Selesai |
-| **5. Hardening & rilis** | Backup harian, error log, uji beban, header keamanan, impor CSV, UAT, PROD | ⬜ Belum |
+| **5. Hardening & rilis** | Backup, error log, impor CSV, kunci go-live, uji beban, UAT, RUNBOOK | ✅ Selesai |
+
+## Fase 5 — Selesai
+
+- **Error log** — error tak terduga dicatat ke sheet `error_log` (tanpa token/password),
+  dipangkas otomatis pada 1000 baris; dilihat lewat tab **Error Log** di halaman Audit
+- **Backup** — `system.backupDatabase` menyalin spreadsheet ke folder Drive dan
+  menyimpan 30 salinan terbaru; `system.backupStatus` untuk daftar. Trigger harian
+  dipasang manual lewat UI (lihat RUNBOOK — sengaja menghindari scope baru)
+- **Impor CSV master** — `master.import` + tombol **Impor CSV** di Master Data;
+  header opsional, validasi per baris, laporan kegagalan per baris
+- **Kunci go-live** — `PROD_LOCK` mematikan `system.setup` & `system.selfTest`
+  tanpa mengganggu transaksi (`system.hardening`)
+- **Uji beban kecil** + **optimasi kinerja** (lihat temuan di bawah)
+- **Dokumen** — [RUNBOOK](RUNBOOK.md) (rilis, backup/restore, kunci, insiden) dan
+  [UAT](UAT.md) (checklist PRD bagian 14)
+
+### Temuan kinerja (jujur)
+
+Target PRD 0,5–2 dtk **belum tercapai** untuk endpoint multi-tabel: `system.health`
+yang tidak menyentuh sheet pun sudah ~1,7 dtk (batas platform), dan tiap
+`getValues()` menambah satu round-trip.
+
+- **Berhasil:** cache per-eksekusi (objek spreadsheet, sheet, baris tabel) →
+  bootstrap −17%, dashboard −27%; `movements` dibaca hanya oleh endpoint yang perlu
+- **Gagal & dicabut:** prefetch semua tabel via `values:batchGet` + `UrlFetchApp`
+  ternyata tidak lebih cepat (bootstrap 3,5 → 4,0 dtk). Alasan didokumentasikan di `Db.gs`
+- **Jalan keluar bila target wajib dipenuhi:** pindahkan datastore dari Sheets
+  (Cloud SQL / Firestore / D1) tanpa mengubah kontrak API
+
+### Belum dikerjakan (perlu keputusan)
+
+- **Email alert** error `INTERNAL` berulang — butuh scope `script.send_mail`,
+  dan menambah scope memaksa otorisasi ulang seluruh Web App
+- **Pemisahan lingkungan PROD** — prosedurnya sudah ada di RUNBOOK, eksekusinya
+  menunggu spreadsheet + deployment produksi
+- Polish opsional: pencarian global, soft-undo void
 
 ## Fase 4 — Selesai
 
@@ -78,7 +115,7 @@ Hasil yang sudah terpasang:
 | Item | Nilai |
 | --- | --- |
 | Proyek Apps Script | "Gudang Titipan API" |
-| Deployment Web App | v24, `access: ANYONE_ANONYMOUS`, `executeAs: USER_DEPLOYING` |
+| Deployment Web App | v30, `access: ANYONE_ANONYMOUS`, `executeAs: USER_DEPLOYING` |
 | Spreadsheet database | `database_gudang_titipan` (17 tabel, header terverifikasi) |
 | Zona waktu | `Asia/Jakarta` |
 | Frontend `API_URL` | sudah diisi di `frontend/js/config.js` |

@@ -99,7 +99,10 @@ export const auth = {
 
 export const system = {
   health: () => api('system.health'),
-  bootstrap: () => api('system.bootstrap')
+  bootstrap: () => api('system.bootstrap'),
+  hardening: (payload) => api('system.hardening', payload || {}, { write: true }),
+  backupDatabase: () => api('system.backupDatabase', {}, { write: true }),
+  backupStatus: () => api('system.backupStatus')
 };
 
 export const dashboard = {
@@ -110,7 +113,8 @@ export const master = {
   list: (entity, filter) => api('master.list', { entity, ...filter }),
   create: (entity, values) => api('master.create', { entity, values }, { write: true }),
   update: (entity, id, values) => api('master.update', { entity, id, values }, { write: true }),
-  remove: (entity, id) => api('master.delete', { entity, id }, { write: true })
+  remove: (entity, id) => api('master.delete', { entity, id }, { write: true }),
+  import: (entity, csv) => api('master.import', { entity, csv }, { write: true })
 };
 
 export const sj = {
@@ -156,4 +160,8 @@ export const users = {
 
 export const audit = {
   list: (filter) => api('audit.list', filter || {})
+};
+
+export const errors = {
+  list: (filter) => api('error.list', filter || {})
 };

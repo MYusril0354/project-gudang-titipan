@@ -30,14 +30,19 @@ var ROUTES = {
   'system.bootstrap': { fn: systemBootstrap_, roles: null, write: false },
   'dashboard.summary': { fn: dashboardSummary_, roles: null, write: false },
 
-  /* --- self-test (ADMIN) --- */
+  /* --- self-test & hardening (ADMIN) --- */
   'system.selfTest': { fn: systemSelfTest_, roles: [ROLES.ADMIN], write: true },
+  'system.hardening': { fn: systemHardening_, roles: [ROLES.ADMIN], write: true },
+  'system.backupDatabase': { fn: backupDatabase_, roles: [ROLES.ADMIN], write: true },
+  'system.backupStatus': { fn: backupStatus_, roles: [ROLES.ADMIN], write: false },
+  'error.list': { fn: errorList_, roles: [ROLES.ADMIN], write: false },
 
   /* --- master data: baca semua, tulis ADMIN --- */
   'master.list': { fn: masterList_, roles: null, write: false },
   'master.create': { fn: masterCreate_, roles: [ROLES.ADMIN], write: true },
   'master.update': { fn: masterUpdate_, roles: [ROLES.ADMIN], write: true },
   'master.delete': { fn: masterDelete_, roles: [ROLES.ADMIN], write: true },
+  'master.import': { fn: masterImport_, roles: [ROLES.ADMIN], write: true },
 
   /* --- surat jalan & penerimaan --- */
   'sj.list': { fn: sjList_, roles: null, write: false },
@@ -94,6 +99,9 @@ function doPost(e) {
     var req = parseRequest_(e);
     var handler = ROUTES[req.action];
     if (!handler) throw apiError_('NOT_FOUND', 'Action tidak dikenal: ' + req.action);
+
+    // Kunci go-live: endpoint sensitif dimatikan lebih dulu, sebelum sesi/DB.
+    assertNotLocked_(req.action);
 
     var ctx = handler.public ? null : requireSession_(req.token, handler.roles);
     var params = req.params || {};
@@ -153,11 +161,4 @@ function toErrorPayload_(err) {
     message: err && err.message ? err.message : 'Terjadi kesalahan pada server.',
     field: (err && err.field) || null
   };
-}
-
-/** Catat error ke sheet error_log (Fase 5 melengkapi ini). */
-function logError_(err, e) {
-  try {
-    console.error('[GudangTitipan]', (err && err.stack) || err, e && e.postData && e.postData.contents);
-  } catch (ignore) { /* logging tidak boleh menggagalkan request */ }
 }
