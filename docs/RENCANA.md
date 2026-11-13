@@ -173,8 +173,20 @@ Halaman **Stok Titipan** dapat dicetak (`frontend/js/print-stock.js`):
 - jendela dibuka sinkron lebih dulu agar tidak diblokir popup, dengan pesan
   "Menyiapkan laporan…" selama data dimuat.
 
-### Nomor batch bisa berupa angka
+### Penyesuaian laporan posisi stok
 
+- Kolom cetak menjadi **No, Kode Pelanggan, Kode Produk, Rak, Batch, Masuk,
+  Sisa, Satuan, ED** — **Nama Produk** dan **Kondisi** dihapus, dan kolom
+  pelanggan memakai **kode pelanggan** agar tabel ringkas (nama produk di data
+  nyata bisa sangat panjang). Rekap per pelanggan memakai nama di tabel terpisah.
+- **Filter Sisa** ditambahkan di halaman Stok Titipan: **Sisa > 0** (default)
+  dan **Sisa = 0**, dan filter ini ikut ke cetakan. Backend `stock.list`
+  menerima `stockFilter`: `POSITIVE` | `EMPTY` | `ALL` (param `includeEmpty`
+  lama tetap jalan sebagai alias `ALL`), dan mengembalikan mode yang dipakai di
+  field `filter`.
+- `batchView_` kini juga mengembalikan `customerCode`.
+
+### Nomor batch bisa berupa angka
 Nomor batch dari pabrik bisa tersimpan sebagai **angka** di sheet (mis.
 `2609431`). Sebelumnya API mengembalikannya apa adanya sehingga tipe datanya
 campur (angka/teks). Sekarang `batchNumber` **selalu dikembalikan sebagai teks**

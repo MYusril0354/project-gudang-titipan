@@ -140,6 +140,7 @@ function batchView_(receipt, ds) {
     unit: product.unit || '',
     sjNo: line.sj_no || '',
     customerId: sj.customer_id || '',
+    customerCode: customer.code || '',
     customerName: customer.name || ''
   };
 }
@@ -167,15 +168,28 @@ function sortBatchViews_(items) {
    ========================================================= */
 
 /**
- * Posisi stok per batch (hanya sisa > 0) + ringkasan per pelanggan.
- * @param {Object} params { q, customerId, productId, includeEmpty }
+ * Posisi stok per batch + ringkasan per pelanggan.
+ *
+ * @param {Object} params { q, customerId, productId, stockFilter }
+ *   stockFilter: 'POSITIVE' (default, sisa > 0) | 'EMPTY' (sisa habis) | 'ALL'.
+ *   `includeEmpty: true` lama tetap didukung sebagai alias 'ALL'.
  */
 function stockList_(params, ctx) {
   var ds = stockDataset_();
-  var includeEmpty = isTrue_(params.includeEmpty);
   var items = allBatchViews_(ds);
 
-  if (!includeEmpty) items = items.filter(function (b) { return b.available > 0; });
+  var mode = String(params.stockFilter || '').trim().toUpperCase();
+  if (isTrue_(params.includeEmpty)) mode = 'ALL';
+  if (!mode) mode = 'POSITIVE';
+
+  if (mode === 'EMPTY') {
+    items = items.filter(function (b) { return b.available <= 0; });
+  } else if (mode === 'ALL') {
+    // tanpa penyaringan tambahan
+  } else {
+    mode = 'POSITIVE';
+    items = items.filter(function (b) { return b.available > 0; });
+  }
 
   var customerId = String(params.customerId || '').trim();
   if (customerId) items = items.filter(function (b) { return String(b.customerId) === customerId; });
@@ -217,6 +231,7 @@ function stockList_(params, ctx) {
   return {
     items: items,
     perCustomer: perCustomer,
+    filter: mode,
     totals: { batches: items.length, qty: totalQty, customers: perCustomer.length }
   };
 }

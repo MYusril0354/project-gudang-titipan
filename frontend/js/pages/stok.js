@@ -20,7 +20,8 @@ export async function renderStokPage(view) {
   const tableWrap = el('div');
   const filter = {
     q: state.filters.stok || '',
-    customerId: state.filters.stokCustomer || ''
+    customerId: state.filters.stokCustomer || '',
+    stockFilter: state.filters.stokFilterMode || 'POSITIVE'
   };
 
   const customerSelect = el('select', { class: 'input' });
@@ -36,12 +37,26 @@ export async function renderStokPage(view) {
     load();
   });
 
+  // Filter sisa: hanya batch yang masih ada, atau batch yang sudah habis.
+  const modeSelect = el('select', { class: 'input', title: 'Filter sisa stok' });
+  [['POSITIVE', 'Sisa > 0'], ['EMPTY', 'Sisa = 0']].forEach(([v, label]) => {
+    const opt = el('option', { value: v, text: label });
+    if (v === filter.stockFilter) opt.selected = true;
+    modeSelect.appendChild(opt);
+  });
+  modeSelect.addEventListener('change', () => {
+    filter.stockFilter = modeSelect.value;
+    state.filters.stokFilterMode = modeSelect.value;
+    load();
+  });
+
   view.appendChild(cardsWrap);
   view.appendChild(panel({
     title: 'Posisi Stok per Batch',
     sub: 'Hanya batch dengan sisa > 0',
     actions: [
       customerSelect,
+      modeSelect,
       searchInput('Cari batch / produk / pelanggan…', filter.q, (v) => {
         filter.q = v;
         state.filters.stok = v;
@@ -53,9 +68,14 @@ export async function renderStokPage(view) {
           try {
             const cust = state.master.customers.find((c) => c.id === filter.customerId);
             await printStockPosition({
-              filter: { q: filter.q, customerId: filter.customerId },
+              filter: {
+                q: filter.q,
+                customerId: filter.customerId,
+                stockFilter: filter.stockFilter
+              },
               customerName: cust ? cust.name : '',
-              keyword: filter.q
+              keyword: filter.q,
+              modeLabel: filter.stockFilter === 'EMPTY' ? 'Sisa = 0' : 'Sisa > 0'
             });
           } catch (err) {
             toast(err.message || 'Gagal menyiapkan cetak', 'err');
@@ -71,7 +91,11 @@ export async function renderStokPage(view) {
     tableWrap.innerHTML = '';
     tableWrap.appendChild(skeleton(6));
     try {
-      const data = await stock.list({ q: filter.q, customerId: filter.customerId });
+      const data = await stock.list({
+        q: filter.q,
+        customerId: filter.customerId,
+        stockFilter: filter.stockFilter
+      });
 
       cardsWrap.innerHTML = '';
       cardsWrap.append(

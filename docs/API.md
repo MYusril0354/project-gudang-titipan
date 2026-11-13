@@ -115,12 +115,17 @@ Karena itu `id` batch = `id` receipt, dan sisa batch selalu dihitung
 ### `stock.list`
 
 ```json
-{ "action": "stock.list", "params": { "q": "", "customerId": "", "includeEmpty": false } }
+{ "action": "stock.list", "params": {
+  "q": "", "customerId": "", "stockFilter": "POSITIVE" } }
 ```
 
-Balasan: `{ items[], perCustomer[], totals:{batches,qty,customers} }`.
+`stockFilter`: **`POSITIVE`** (default, sisa > 0) · **`EMPTY`** (sisa habis / ≤ 0) ·
+**`ALL`** (semua batch). `includeEmpty: true` lama tetap didukung sebagai alias
+`ALL`. Nilai mode yang dipakai dikembalikan pada field `filter`.
+
+Balasan: `{ items[], perCustomer[], filter, totals:{batches,qty,customers} }`.
 Tiap item: `{ id, batchNumber, date, ed, qtyIn, available, kondisi, rackId, rackCode,
-productId, productCode, productName, unit, sjNo, customerId, customerName }`.
+productId, productCode, productName, unit, sjNo, customerId, customerCode, customerName }`.
 
 > `batchNumber` **selalu string**, walaupun di sheet tersimpan sebagai angka
 > (mis. `2609431`) — nomor batch bisa berupa angka murni dari pabrik.
@@ -128,6 +133,12 @@ productId, productCode, productName, unit, sjNo, customerId, customerName }`.
 Dipakai juga oleh **cetak Laporan Posisi Stok** (`frontend/js/print-stock.js`),
 yang memanggil ulang action ini dengan `{ fresh: true }` lewat klien API supaya
 angka pada dokumen tidak berasal dari salinan cache.
+
+**Susunan kolom cetak posisi stok:** `No, Kode Pelanggan, Kode Produk, Rak,
+Batch, Masuk, Sisa, Satuan, ED` — kolom **Nama Produk** dan **Kondisi**
+dihilangkan, dan kolom pelanggan memakai **kode pelanggan** (bukan nama) supaya
+tabel tetap ringkas. Rekap per pelanggan memakai nama pelanggan di tabel
+terpisah.
 
 ### `stock.available`
 

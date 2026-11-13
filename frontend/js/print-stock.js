@@ -18,7 +18,7 @@ import { fmt, fmtDate } from './state.js';
  * Cetak laporan posisi stok.
  * Jendela dibuka sinkron lebih dulu supaya tidak diblokir popup blocker.
  *
- * @param {{filter?: object, customerName?: string, keyword?: string}} opts
+ * @param {{filter?: object, customerName?: string, keyword?: string, modeLabel?: string}} opts
  */
 export async function printStockPosition(opts = {}) {
   const win = window.open('', '_blank');
@@ -49,7 +49,7 @@ export async function printStockPosition(opts = {}) {
 /**
  * Bangun HTML laporan (fungsi murni, bisa diuji tanpa membuka jendela).
  * @param {object} data hasil `stock.list`
- * @param {{customerName?: string, keyword?: string, printedAt?: string}} opts
+ * @param {{customerName?: string, keyword?: string, printedAt?: string, modeLabel?: string}} opts
  * @returns {string} HTML lengkap
  */
 export function buildStockDocument(data, opts = {}) {
@@ -62,6 +62,7 @@ export function buildStockDocument(data, opts = {}) {
 
   setText(doc, '#judul', 'LAPORAN POSISI STOK TITIPAN');
   setText(doc, '#filterPelanggan', opts.customerName || 'Semua pelanggan');
+  setText(doc, '#filterMode', opts.modeLabel || 'Sisa > 0');
   setText(doc, '#filterKata', opts.keyword ? `Kata kunci: "${opts.keyword}"` : '');
   setText(doc, '#dicatat', opts.printedAt || new Date().toLocaleString('id-ID'));
   setText(doc, '#fTotalBatch', fmt(totals.batches));
@@ -69,6 +70,7 @@ export function buildStockDocument(data, opts = {}) {
   setText(doc, '#fTotalPelanggan', fmt(totals.customers));
 
   // --- tabel batch ---
+  // Urutan kolom: No, Kode Pelanggan, Kode Produk, Rak, Batch, Masuk, Sisa, Satuan, ED
   const tbody = doc.querySelector('#rows');
   let totalIn = 0;
 
@@ -77,20 +79,18 @@ export function buildStockDocument(data, opts = {}) {
     const tr = doc.createElement('tr');
     [
       String(i + 1),
-      b.batchNumber || '—',
+      b.customerCode || '—',
       b.productCode || '—',
-      b.productName || '—',
-      b.customerName || '—',
       b.rackCode || '—',
+      String(b.batchNumber || '') || '—',
       fmt(b.qtyIn),
       fmt(b.available),
       b.unit || '',
-      b.ed ? fmtDate(b.ed) : '—',
-      b.kondisi || '—'
+      b.ed ? fmtDate(b.ed) : '—'
     ].forEach((text, idx) => {
       const td = doc.createElement('td');
       td.textContent = text;
-      if (idx === 0 || idx === 6 || idx === 7 || idx === 9) td.className = 'c';
+      if (idx === 0 || idx === 5 || idx === 6 || idx === 8) td.className = 'c';
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -99,7 +99,7 @@ export function buildStockDocument(data, opts = {}) {
   if (!items.length) {
     const tr = doc.createElement('tr');
     const td = doc.createElement('td');
-    td.colSpan = 11;
+    td.colSpan = 9;
     td.className = 'empty';
     td.textContent = 'Tidak ada batch yang cocok dengan filter.';
     tr.appendChild(td);
@@ -194,6 +194,7 @@ const TEMPLATE = `
   <div class="info">
     <div class="box"><span class="k">Pelanggan</span><span id="filterPelanggan"></span>
       <div class="sub" id="filterKata" style="text-align:left"></div></div>
+    <div class="box"><span class="k">Filter Sisa</span><b id="filterMode"></b></div>
     <div class="box"><span class="k">Total Batch</span><b id="fTotalBatch"></b></div>
     <div class="box"><span class="k">Total Sisa (unit)</span><b id="fTotalQty"></b></div>
     <div class="box"><span class="k">Pelanggan Berstok</span><b id="fTotalPelanggan"></b></div>
@@ -202,26 +203,24 @@ const TEMPLATE = `
   <table>
     <thead>
       <tr>
-        <th style="width:8mm">No</th>
-        <th style="width:32mm">No. Batch</th>
-        <th style="width:22mm">Kode</th>
-        <th>Nama Produk</th>
-        <th style="width:45mm">Pelanggan</th>
-        <th style="width:18mm">Rak</th>
-        <th style="width:16mm">Masuk</th>
-        <th style="width:16mm">Sisa</th>
-        <th style="width:14mm">Satuan</th>
-        <th style="width:22mm">ED</th>
-        <th style="width:20mm">Kondisi</th>
+        <th style="width:9mm">No</th>
+        <th style="width:26mm">Kode Pelanggan</th>
+        <th style="width:26mm">Kode Produk</th>
+        <th style="width:30mm">Rak</th>
+        <th>Batch</th>
+        <th style="width:20mm">Masuk</th>
+        <th style="width:20mm">Sisa</th>
+        <th style="width:18mm">Satuan</th>
+        <th style="width:26mm">ED</th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
     <tfoot>
       <tr>
-        <td colspan="6">TOTAL</td>
+        <td colspan="5">TOTAL</td>
         <td class="c" id="tMasuk"></td>
         <td class="c" id="tSisa"></td>
-        <td colspan="3"></td>
+        <td colspan="2"></td>
       </tr>
     </tfoot>
   </table>

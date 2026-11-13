@@ -30,6 +30,7 @@ export const state = {
     pending: '',
     stok: '',
     stokCustomer: '',
+    stokFilterMode: 'POSITIVE',
     pengiriman: '',
     pengirimanStatus: '',
     kartu: { code: '', batch: '', customer: '', from: '', to: '' }
