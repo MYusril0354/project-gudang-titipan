@@ -85,6 +85,7 @@ Satu-satunya action yang juga menerima `GET`: `GET {GAS_EXEC_URL}?action=system.
 | `sj.create` | ADMIN, GUDANG | ✓ | Buat SJ + baris |
 | `sj.line.suggestBatch` | ADMIN, GUDANG | – | Saran No. Batch untuk tanggal tertentu |
 | `sj.line.receive` | ADMIN, GUDANG | ✓ | Fisik Ada → receipt + batch + mutasi IN |
+| `sj.receiveAll` | ADMIN, GUDANG | ✓ | **Fisik Terima**: terima semua baris bersisa pada satu SJ sekaligus |
 | `sj.line.wait` | ADMIN, GUDANG | ✓ | Fisik Belum Ada (alasan, ETA, PIC) |
 | `sj.line.cancel` | ADMIN, GUDANG | ✓ | Batalkan sisa |
 | `sj.import` | ADMIN, GUDANG | ✓ | Impor banyak Surat Jalan dari satu CSV (dikelompokkan per `no_sj`) |
@@ -260,6 +261,36 @@ sebelum tanggal SJ.
 `planned_ed` dari baris SJ; bila rencana juga kosong, No. Batch dibuat otomatis
 dari counter. ED tidak boleh sebelum tanggal penerimaan. Balasan menyertakan
 `batchNumber` dan `ed` yang tersimpan.
+
+> **No. Batch TIDAK dipaksa unik.** Nomor batch pabrik/supplier boleh muncul di
+> beberapa Surat Jalan, bahkan beberapa baris dalam satu Surat Jalan. Aman karena
+> stok dihitung per `id` receipt, bukan per nomor batch.
+
+### `sj.receiveAll` — Fisik Terima (semua baris satu SJ)
+
+```json
+{ "action": "sj.receiveAll", "params": {
+  "sjNo": "DN.01.261104.038", "date": "2026-11-13",
+  "rackId": "<id rak>", "kondisi": "Baik", "pic": "Andi", "ed": "2027-06-30" } }
+```
+
+- Qty yang diterima = **seluruh sisa pending** tiap baris.
+- Baris yang sudah diterima/dibatalkan **dilewati** (`linesSkipped`).
+- No. Batch memakai `planned_batch` baris bila ada; kalau tidak, dibuat otomatis
+  berurutan (dalam lock).
+- ED memakai `planned_ed` baris; kalau tidak ada, memakai `ed` yang dikirim.
+- Rak memakai `rackId` yang dikirim, atau rak pertama gudang titipan pelanggan.
+- **Seluruh validasi dijalankan sebelum penulisan pertama**, jadi tidak ada
+  penerimaan setengah jalan bila ada data tidak valid.
+- Bila semua baris sudah selesai → `VALIDATION_ERROR`
+  ("Semua baris Surat Jalan ini sudah diterima atau dibatalkan").
+
+Balasan: `{ sjNo, date, rackId, rackCode, kondisi, pic, received[{lineId,
+productId, productCode, productName, unit, batchNumber, ed, qty}], linesReceived,
+linesSkipped, totalQty, sjStatus }`.
+
+> Kode error `DUPLICATE` tetap dipakai untuk hal lain: kode master data, No SJ,
+> username, dan gudang titipan ganda per pelanggan. Yang dibebaskan hanya No. Batch.
 
 ### `sj.import`
 

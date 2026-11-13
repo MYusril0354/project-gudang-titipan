@@ -93,7 +93,7 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 | Item | Nilai |
 | --- | --- |
 | Proyek Apps Script | Gudang Titipan API |
-| Deployment | Web App v36 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
+| Deployment | Web App v37 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
 | Spreadsheet database | `database_gudang_titipan` (17 tabel) |
 | Zona waktu | `Asia/Jakarta` |
 | Endpoint | URL `/exec` sudah diisi di [frontend/js/config.js](frontend/js/config.js) |

@@ -52,6 +52,7 @@ var ROUTES = {
   'sj.create': { fn: sjCreate_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.line.suggestBatch': { fn: sjLineSuggestBatch_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: false },
   'sj.line.receive': { fn: sjLineReceive_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
+  'sj.receiveAll': { fn: sjReceiveAll_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.line.wait': { fn: sjLineWait_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.line.cancel': { fn: sjLineCancel_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.import': { fn: sjImport_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },

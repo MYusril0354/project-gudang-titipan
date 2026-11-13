@@ -16,7 +16,7 @@ import {
   el, btn, badge, panel, callout, emptyBox, skeleton, errorBox,
   searchInput, toast, sub, kodeTag, rakTag, batchTag, progressBar
 } from '../ui.js';import { openCreateSJ } from '../modals/sj-create.js';
-import { openReceive, openWait, openCancel } from '../modals/sj.js';
+import { openReceive, openReceiveAll, openWait, openCancel } from '../modals/sj.js';
 import { openImportCsv } from '../modals/import.js';
 
 /**
@@ -114,7 +114,10 @@ function buildCard(item) {
         ])
       ])
     ]),
-    el('div', {}, [badge(meta.label, meta.cls)])
+    el('div', { class: 'head-right' }, [
+      buildReceiveAllButton(item),
+      badge(meta.label, meta.cls)
+    ])
   ]);
 
   const rows = item.lines.map((line) => buildLineRow(item, line));
@@ -136,9 +139,31 @@ function buildCard(item) {
   return el('div', { class: 'sj-card' }, [head, table]);
 }
 
+/**
+ * Tombol "Fisik Terima" pada kepala kartu SJ: menerima SEMUA baris bersisa
+ * sekaligus. Hanya tampil bila peran boleh menulis dan masih ada sisa.
+ */
+function buildReceiveAllButton(sjItem) {
+  const canWrite = state.user && (state.user.role === 'ADMIN' || state.user.role === 'GUDANG');
+  const pendingLines = (sjItem.lines || []).filter((l) => l.pending > 0);
+
+  if (!canWrite || !pendingLines.length) return el('span');
+
+  const reload = () => {
+    const page = document.querySelector('#view');
+    if (page) renderPenerimaanPage(page);
+  };
+
+  const totalQty = pendingLines.reduce((a, l) => a + l.pending, 0);
+  return btn(`Fisik Terima (${pendingLines.length} baris · ${fmt(totalQty)})`, {
+    variant: 'ok',
+    title: 'Terima semua produk pada Surat Jalan ini sekaligus',
+    onClick: () => openReceiveAll(sjItem, reload)
+  });
+}
+
 /** Satu baris SJ + aksi sesuai status. */
-function buildLineRow(sjItem, line) {
-  const meta = STATUS_META[line.status] || STATUS_META.OPEN;
+function buildLineRow(sjItem, line) {  const meta = STATUS_META[line.status] || STATUS_META.OPEN;
 
   // Kolom produk
   const productCell = el('td', { 'data-label': 'Produk' }, [

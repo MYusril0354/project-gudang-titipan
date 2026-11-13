@@ -87,7 +87,36 @@ memeriksa pola, sehingga tanggal mustahil seperti `2026-13-99` atau `2026-02-30`
 lolos. Sekarang tanggal benar-benar divalidasi (termasuk rentang tahun
 2000–2100), dan impor melaporkannya per baris.
 
-## Tambahan berikutnya — Satuan produk bebas
+## Tambahan berikutnya — Satuan bebas, Batch boleh sama, Fisik Terima
+
+Permintaan pengguna atas data nyata:
+
+**1. No. Batch tidak lagi dipaksa unik** (menyimpang dari PRD temuan #10).
+Pengguna memakai nomor batch pabrik/supplier (mis. `2605224`) yang memang muncul
+di beberapa Surat Jalan. Aman karena satu batch = satu baris `receipts`, dan
+seluruh perhitungan memakai `receipts.id`. Fungsi `assertBatchUnique_` dihapus.
+
+**2. Tombol "Fisik Terima" per Surat Jalan** — menerima seluruh sisa tiap baris
+pada satu SJ dengan satu klik, lewat action baru `sj.receiveAll`:
+
+- satu request untuk semua baris (bukan N request terpisah),
+- seluruh validasi dijalankan **sebelum** penulisan pertama, sehingga tidak ada
+  penerimaan setengah jalan,
+- memakai rencana batch & ED per baris bila ada; batch lain dibuat otomatis,
+- baris yang sudah selesai dilewati dan dilaporkan sebagai `linesSkipped`.
+
+Tombol hanya muncul bila peran boleh menulis dan masih ada baris bersisa; SJ yang
+sudah selesai tidak menampilkan tombol.
+
+**Verifikasi tanpa menyentuh data pengguna:** database dicadangkan lebih dulu
+(`system.backupDatabase`), lalu seluruh pengujian dijalankan pada jalur yang
+berhenti di validasi sebelum menulis (batch duplikat + rak salah, `receiveAll`
+pada SJ tidak ada / SJ selesai / rak salah / PIC kosong) dan E2E hanya-baca
+(buka modal lalu Batal). Snapshot sebelum dan sesudah identik
+(`sj=10, batch=14, qty=33649`), 0 console error. Jalur sukses `receiveAll`
+sengaja **tidak** dijalankan otomatis agar tidak mengubah data pengguna.
+
+### Satuan produk bebas
 
 Atas permintaan pengguna, **satuan produk tidak lagi dibatasi daftar tetap**.
 Ini **menyimpang dari PRD 6.8** (`pcs, rim, pak, box, lusin, unit, kg, liter`)

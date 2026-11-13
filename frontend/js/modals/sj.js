@@ -13,7 +13,7 @@ import { sj } from '../api.js';
 import { state, fmt, fmtDate } from '../state.js';
 import { racksOfCustomer, consignLocationOf } from '../state.js';
 import {
-  el, btn, modal, field, select, grid2, infobox, toast, kodeTag, callout
+  el, btn, modal, field, select, grid2, infobox, toast, kodeTag, batchTag, callout
 } from '../ui.js';
 
 /** Error pertama dari server ditandai pada field terkait. */
@@ -173,6 +173,141 @@ export async function openReceive(line, onDone) {
   });
 
   await refreshBatch();
+}
+
+/**
+ * Fisik Terima — terima SEMUA baris bersisa pada satu Surat Jalan sekaligus.
+ *
+ * Qty yang diterima = seluruh sisa pending tiap baris. No. Batch & ED memakai
+ * rencana baris bila ada; kalau tidak, batch dibuat otomatis oleh server.
+ *
+ * @param {{no:string, customerId:string, customerName:string, lines:Array}} sjItem
+ * @param {Function} onDone
+ */
+export async function openReceiveAll(sjItem, onDone) {
+  const racks = racksOfCustomer(sjItem.customerId);
+  const consign = consignLocationOf(sjItem.customerId);
+
+  if (!consign || !racks.length) {
+    toast('Pelanggan ini belum punya gudang titipan/rak. Tambahkan di Master Data.', 'err');
+    return;
+  }
+
+  const targets = (sjItem.lines || []).filter((l) => l.pending > 0);
+  if (!targets.length) {
+    toast('Semua baris Surat Jalan ini sudah diterima.', 'warn');
+    return;
+  }
+
+  const totalQty = targets.reduce((a, l) => a + l.pending, 0);
+  const withPlan = targets.filter((l) => l.plannedBatch).length;
+
+  const dateInput = el('input', { type: 'date', value: state.serverDate || '', required: true });
+  const rackSelect = select(
+    racks.map((r) => ({ value: r.id, label: `${r.code} — ${r.name}` })),
+    racks[0] ? racks[0].id : ''
+  );
+  const kondisiSelect = select(state.constants.kondisi || ['Baik', 'Rusak sebagian'], 'Baik');
+  const picInput = el('input', {
+    type: 'text',
+    value: (state.user && state.user.nama) || 'Admin Gudang',
+    required: true
+  });
+  const edInput = el('input', { type: 'date', value: '' });
+
+  const submitBtn = btn('Terima Semua', { variant: 'ok' });
+
+  const rows = targets.map((l) => el('tr', {}, [
+    el('td', {}, [
+      el('div', {}, [el('b', { text: l.productName })]),
+      el('div', { class: 'sub' }, [kodeTag(l.productCode)])
+    ]),
+    el('td', { class: 'num' }, [
+      el('b', { text: fmt(l.pending) }),
+      document.createTextNode(` ${l.unit}`)
+    ]),
+    el('td', {}, [
+      l.plannedBatch ? batchTag(l.plannedBatch) : el('span', { class: 'sub', text: 'otomatis' })
+    ]),
+    el('td', { text: l.plannedEd ? fmtDate(l.plannedEd) : '—' })
+  ]));
+
+  const dlg = modal({
+    title: 'Fisik Terima — Semua Baris',
+    sub: 'Seluruh sisa tiap baris pada Surat Jalan ini akan diterima sekaligus',
+    body: [
+      infobox([
+        ['Surat Jalan', sjItem.no],
+        ['Pelanggan', sjItem.customerName],
+        ['Baris diterima', String(targets.length)],
+        ['Total qty', `${fmt(totalQty)} unit`],
+        ['Pakai rencana batch', `${withPlan} dari ${targets.length} baris`],
+        ['Gudang titipan', consign.name]
+      ]),
+      el('table', { class: 'tbl tbl-resp' }, [
+        el('thead', {}, [
+          el('tr', {}, [
+            el('th', { text: 'Produk' }),
+            el('th', { class: 'num', text: 'Qty diterima' }),
+            el('th', { text: 'No. Batch' }),
+            el('th', { text: 'ED' })
+          ])
+        ]),
+        el('tbody', {}, rows)
+      ]),
+      el('div', { style: { height: '14px' } }),
+      grid2([
+        field('Tanggal fisik', dateInput, null, true),
+        field('Lokasi rak tujuan', rackSelect, null, true)
+      ]),
+      grid2([
+        field('Kondisi', kondisiSelect, null, false),
+        field('Petugas penerima', picInput, null, true)
+      ]),
+      field('ED untuk baris tanpa rencana', edInput,
+        'Opsional. Baris yang sudah punya ED rencana memakai ED rencananya.', false)
+    ],
+    footer: [
+      btn('Batal', { onClick: () => dlg.close() }),
+      submitBtn
+    ]
+  });
+
+  submitBtn.addEventListener('click', async () => {
+    if (!picInput.value.trim()) {
+      markInvalid(picInput);
+      toast('Petugas penerima wajib diisi.', 'err');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Menerima…';
+    try {
+      const res = await sj.receiveAll({
+        sjNo: sjItem.no,
+        date: dateInput.value,
+        rackId: rackSelect.value,
+        kondisi: kondisiSelect.value,
+        pic: picInput.value.trim(),
+        ed: edInput.value || undefined
+      });
+      dlg.close();
+      toast(
+        `${res.linesReceived} baris diterima (${fmt(res.totalQty)} unit) pada ${res.sjNo}`
+          + (res.linesSkipped ? `, ${res.linesSkipped} baris dilewati` : '') + '.',
+        'ok'
+      );
+      if (onDone) await onDone();
+    } catch (err) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Terima Semua';
+      if (err.field === 'pic') markInvalid(picInput);
+      if (err.field === 'rackId') markInvalid(rackSelect);
+      if (err.field === 'date') markInvalid(dateInput);
+      if (err.field === 'ed') markInvalid(edInput);
+      toast(err.message || 'Gagal menerima semua baris', 'err');
+    }
+  });
 }
 
 /**

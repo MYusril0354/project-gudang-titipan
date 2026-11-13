@@ -371,17 +371,19 @@ function sjView_(sj, ds) {
    VALIDASI
    ========================================================= */
 
-/** No. Batch wajib unik (PRD temuan #10). */
-function assertBatchUnique_(batchNumber, excludeReceiptId) {
-  var target = String(batchNumber || '').trim().toUpperCase();
-  var clash = readTable_('receipts').filter(function (r) {
-    if (excludeReceiptId && String(r.id) === String(excludeReceiptId)) return false;
-    return String(r.batch_number || '').trim().toUpperCase() === target;
-  });
-  if (clash.length) {
-    throw apiError_('DUPLICATE', 'No. Batch "' + batchNumber + '" sudah dipakai.', 'batchNumber');
-  }
-}
+/*
+ * CATATAN: No. Batch TIDAK lagi dipaksa unik.
+ *
+ * Sebelumnya ada `assertBatchUnique_` (PRD temuan #10). Aturan itu dihapus atas
+ * permintaan pengguna karena di lapangan nomor batch pabrik/supplier memang bisa
+ * muncul di lebih dari satu Surat Jalan, dan bahkan pada beberapa baris dalam
+ * satu Surat Jalan yang sama.
+ *
+ * Aman untuk perhitungan: satu batch = satu baris `receipts`, dan seluruh stok /
+ * pengiriman / kartu stock memakai **id receipt**, bukan nomor batch. Jadi dua
+ * penerimaan dengan nomor batch sama tetap dua batch terpisah dan saldonya tidak
+ * saling bercampur. Nomor batch hanya label penelusuran.
+ */
 
 /**
  * Gudang titipan (CONSIGN) milik pelanggan + rak-nya.
@@ -789,10 +791,9 @@ function sjLineReceive_(params, ctx) {
 
   // No. Batch: pakai kiriman, kalau kosong pakai RENCANA dari baris SJ,
   // kalau masih kosong baru dibuat otomatis dari counter (dalam lock).
+  // Nomor batch TIDAK dipaksa unik — lihat catatan di bagian VALIDASI.
   var batchNumber = String(params.batchNumber || line.planned_batch || '').trim().toUpperCase();
-  if (batchNumber) {
-    assertBatchUnique_(batchNumber, null);
-  } else {
+  if (!batchNumber) {
     batchNumber = nextBatchNumber_(date);
   }
 
@@ -873,6 +874,185 @@ function sjLineReceive_(params, ctx) {
     qty: qty,
     pendingAfter: pendingAfter,
     lineStatus: lineStatus_(Object.assign({}, line, patch), receiptsAfter),
+    sjStatus: sjStatus
+  };
+}
+
+/**
+ * Fisik Terima — terima SEMUA baris yang masih bersisa pada satu Surat Jalan
+ * (permintaan pengguna: satu tombol per SJ, bukan per baris).
+ *
+ * Perilaku:
+ *  - Hanya baris dengan pending > 0 yang diproses; baris yang sudah diterima
+ *    atau dibatalkan dilewati.
+ *  - Qty yang diterima = SELURUH sisa pending baris tersebut.
+ *  - No. Batch memakai RENCANA baris bila ada; kalau kosong dibuat otomatis
+ *    (berurutan, dalam lock).
+ *  - ED memakai RENCANA baris bila ada; kalau tidak, memakai `ed` yang dikirim
+ *    (boleh kosong).
+ *  - Rak: memakai `rackId` yang dikirim, atau rak pertama gudang titipan
+ *    pelanggan tersebut.
+ *
+ * Seluruh validasi dijalankan SEBELUM penulisan pertama, jadi tidak ada
+ * penerimaan setengah jalan bila ada data yang tidak valid.
+ *
+ * @param {Object} params { sjNo, date, pic, rackId, kondisi, ed }
+ */
+function sjReceiveAll_(params, ctx) {
+  var sjNo = String(assertRequired_(params.sjNo, 'sjNo', 'No SJ')).trim();
+
+  var sjs = readTableWhere_('sj', { no: sjNo });
+  if (!sjs.length) throw apiError_('NOT_FOUND', 'Surat Jalan tidak ditemukan.', 'sjNo');
+  var sj = sjs[0];
+
+  var date = assertDate_(params.date || todayStr_(), 'date');
+  if (String(date) < String(sj.date)) {
+    throw apiError_('VALIDATION_ERROR',
+      'Tanggal fisik tidak boleh sebelum tanggal SJ (' + sj.date + ').', 'date');
+  }
+
+  // Pelanggan wajib punya gudang titipan + rak.
+  var consign = consignOf_(sj.customer_id);
+  var rackId = String(params.rackId || (consign.racks[0] ? consign.racks[0].id : '')).trim();
+  var rack = consign.racks.filter(function (r) { return String(r.id) === rackId; })[0];
+  if (!rack) {
+    throw apiError_('VALIDATION_ERROR',
+      'Rak tujuan bukan milik gudang titipan pelanggan ini.', 'rackId');
+  }
+
+  var kondisi = String(params.kondisi || 'Baik').trim();
+  if (KONDISI_.indexOf(kondisi) === -1) {
+    throw apiError_('VALIDATION_ERROR', 'Kondisi harus: ' + KONDISI_.join(' / ') + '.', 'kondisi');
+  }
+  var pic = String(assertRequired_(params.pic, 'pic', 'Petugas penerima')).trim();
+  var fallbackEd = params.ed ? assertDate_(params.ed, 'ed') : '';
+
+  // Sisa tiap baris dihitung sekali dari seluruh receipts.
+  var allReceipts = readTable_('receipts');
+  var receiptsByLine = {};
+  allReceipts.forEach(function (r) {
+    var k = String(r.sj_line_id);
+    if (!receiptsByLine[k]) receiptsByLine[k] = [];
+    receiptsByLine[k].push(r);
+  });
+
+  var productsById = {};
+  readTable_('products').forEach(function (p) { productsById[String(p.id)] = p; });
+
+  var lines = readTableWhere_('sj_lines', { sj_no: sjNo });
+  var plan = [];
+  var skipped = 0;
+
+  lines.forEach(function (line) {
+    var receipts = receiptsByLine[String(line.id)] || [];
+    var pending = pendingOf_(line, receipts);
+    if (pending <= 0) { skipped++; return; }
+
+    var ed = line.planned_ed || fallbackEd;
+    var product = productsById[String(line.product_id)] || {};
+
+    plan.push({
+      lineId: line.id,
+      productId: line.product_id,
+      productCode: product.code || '',
+      productName: product.name || '(produk terhapus)',
+      unit: product.unit || '',
+      qty: pending,
+      batchNumber: String(line.planned_batch || '').trim().toUpperCase(),
+      ed: ed
+    });
+  });
+
+  if (!plan.length) {
+    throw apiError_('VALIDATION_ERROR',
+      'Semua baris Surat Jalan ini sudah diterima atau dibatalkan — tidak ada sisa yang bisa diterima.');
+  }
+
+  // Validasi ED sebelum menulis apa pun.
+  plan.forEach(function (p) {
+    if (p.ed && String(p.ed) < String(date)) {
+      throw apiError_('VALIDATION_ERROR',
+        'ED batch ' + (p.batchNumber || p.productCode) + ' (' + p.ed + ') tidak boleh sebelum tanggal terima (' + date + ').', 'ed');
+    }
+  });
+
+  // ---- Eksekusi ----
+  var now = nowStamp_();
+  var received = [];
+
+  plan.forEach(function (p) {
+    var batchNumber = p.batchNumber || nextBatchNumber_(date);
+
+    appendRow_('receipts', {
+      id: newId_(),
+      sj_line_id: p.lineId,
+      qty: p.qty,
+      rack_id: rackId,
+      date: date,
+      pic: pic,
+      batch_number: batchNumber,
+      kondisi: kondisi,
+      ed: p.ed,
+      created_at: now,
+      created_by: ctx.username,
+      updated_at: now,
+      updated_by: ctx.username
+    });
+
+    appendRow_('movements', {
+      id: newId_(),
+      date: date,
+      type: 'CONSIGN_IN',
+      ref: sjNo,
+      product_id: p.productId,
+      customer_id: sj.customer_id,
+      rack_id: rackId,
+      qty: p.qty,
+      batch_number: batchNumber,
+      sj_ref: sjNo,
+      note: 'Penerimaan fisik (semua baris)',
+      created_at: now
+    });
+
+    updateById_('sj_lines', p.lineId, {
+      decision: 'DONE',
+      updated_at: now,
+      updated_by: ctx.username
+    });
+
+    received.push({
+      lineId: p.lineId,
+      productId: p.productId,
+      productCode: p.productCode,
+      productName: p.productName,
+      unit: p.unit,
+      batchNumber: batchNumber,
+      ed: p.ed,
+      qty: p.qty
+    });
+  });
+
+  var sjStatus = sjRefreshStatus_(sjNo, ctx);
+  var totalQty = received.reduce(function (a, r) { return a + r.qty; }, 0);
+
+  audit_(ctx, 'sj.receiveAll', 'sj', sjNo, {
+    lines: received.length,
+    qty: totalQty,
+    skipped: skipped,
+    date: date
+  });
+
+  return {
+    sjNo: sjNo,
+    date: date,
+    rackId: rackId,
+    rackCode: rack.code,
+    kondisi: kondisi,
+    pic: pic,
+    received: received,
+    linesReceived: received.length,
+    linesSkipped: skipped,
+    totalQty: totalQty,
     sjStatus: sjStatus
   };
 }
