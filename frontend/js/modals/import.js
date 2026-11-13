@@ -26,7 +26,7 @@ const ENTITY_INFO = {
     label: 'Produk',
     fields: 'kode, nama, satuan',
     sample: 'kode,nama,satuan\nPRD-101,Kertas A4 80gsm,rim\nPRD-102,Tinta Printer,pcs',
-    note: 'Satuan harus salah satu: pcs, rim, pak, box, lusin, unit, kg, liter.'
+    note: 'Satuan bebas diisi (mis. pcs, rim, dus, bal, roll, meter) — maksimal 20 karakter.'
   },
   customer: {
     label: 'Pelanggan',

@@ -87,6 +87,25 @@ memeriksa pola, sehingga tanggal mustahil seperti `2026-13-99` atau `2026-02-30`
 lolos. Sekarang tanggal benar-benar divalidasi (termasuk rentang tahun
 2000–2100), dan impor melaporkannya per baris.
 
+## Tambahan berikutnya — Satuan produk bebas
+
+Atas permintaan pengguna, **satuan produk tidak lagi dibatasi daftar tetap**.
+Ini **menyimpang dari PRD 6.8** (`pcs, rim, pak, box, lusin, unit, kg, liter`)
+secara sengaja.
+
+- Backend: `assertUnitValid_` menggantikan pemeriksaan whitelist. Yang dijaga
+  hanya kewajaran — wajib diisi, maksimal 20 karakter, tanpa karakter kontrol —
+  supaya nilai aneh tidak merusak tabel dan dokumen cetak.
+- `SATUAN_` diganti nama menjadi `SATUAN_UMUM_` dan berubah peran menjadi
+  **saran** (kini termasuk `dus`, `bal`, `roll`, `meter`). Tetap dikirim lewat
+  `system.bootstrap` sebagai `constants.satuan`.
+- Frontend: field satuan di Master Data berubah dari `<select>` menjadi input
+  teks dengan `<datalist>` (tipe field baru `combo`), jadi nilai bebas bisa
+  diketik sementara saran tetap muncul.
+- Impor CSV: catatan kolom satuan diperbarui.
+- Uji: self-test kini memeriksa "satuan bebas diterima" dan "satuan > 20
+  karakter ditolak" (20/20 lolos).
+
 ## Fase 4 — Selesai
 
 - `dashboard.summary` — 4 kartu (stok, pending fisik, SJ belum selesai, belum POD),

@@ -20,7 +20,7 @@ function systemBootstrap_(params, ctx) {
     racks: readMaster_('rack'),
     constants: {
       alasan: ALASAN_,
-      satuan: SATUAN_,
+      satuan: SATUAN_UMUM_,
       role: ROLES,
       kondisi: KONDISI_,
       cancelReasons: CANCEL_REASONS_
@@ -314,8 +314,8 @@ var ALASAN_ = {
   LAINNYA: 'Lainnya'
 };
 
-/** Satuan produk yang diizinkan (PRD 6.8). */
-var SATUAN_ = ['pcs', 'rim', 'pak', 'box', 'lusin', 'unit', 'kg', 'liter'];
+/** Satuan yang SERING dipakai — hanya saran untuk UI, bukan batasan (satuan bebas). */
+var SATUAN_UMUM_ = ['pcs', 'rim', 'pak', 'box', 'lusin', 'unit', 'kg', 'liter', 'dus', 'bal', 'roll', 'meter'];
 
 /** Info kop surat — dibaca dari Script Properties agar bisa diubah tanpa deploy. */
 function getCompany_() {

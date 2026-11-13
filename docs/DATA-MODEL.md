@@ -9,7 +9,7 @@ Kolom `id` diisi server. Semua tabel punya `created_at`, `created_by`, `updated_
 | --- | --- |
 | `users` | id, username, nama, role, password_hash, salt, aktif, failed_count, locked_until |
 | `sessions` | token, user_id, expires_at |
-| `products` | id, code (unik), name, unit |
+| `products` | id, code (unik), name, unit (**teks bebas**, maks 20 karakter) |
 | `customers` | id, code (unik), name, address, phone |
 | `locations` | id, type (MAIN/CONSIGN), name, customer_id |
 | `racks` | id, code (unik), name, location_id |
@@ -41,6 +41,7 @@ Header lengkap tiap tabel ada di `backend/src/Db.gs` (`HEADERS_`).
 5. **Satu pelanggan = satu gudang titipan** (aturan PRD 6.6). Gudang bertipe `MAIN` tidak terkait pelanggan.
 6. **Batch & ED punya dua tahap.** Saat SJ dibuat/impor, `planned_batch` & `planned_ed` diisi sebagai **rencana** — stok **tidak** bertambah. Batch dan ED yang benar-benar diterima disimpan di `receipts` (`batch_number`, `ed`) saat Fisik Ada dikonfirmasi, dengan nilai rencana sebagai default yang boleh diubah.
 7. **Kolom baru selalu ditambahkan di AKHIR** daftar `HEADERS_` supaya posisi kolom (dan seluruh data lama) tidak bergeser. Setelah menambah kolom, jalankan `system.migrate` (ADMIN) untuk menuliskan header yang belum ada; header yang sudah berisi nama lain **tidak** ditimpa, hanya dilaporkan sebagai konflik.
+8. **Satuan produk bebas diisi** (teks, maksimal 20 karakter) — menyimpang dari PRD 6.8 yang membatasi daftar tetap `pcs, rim, pak, box, lusin, unit, kg, liter`, atas permintaan pengguna. Daftar `SATUAN_UMUM_` tetap disediakan sebagai **saran** di UI (datalist), bukan aturan. Validasi yang tersisa hanya kewajaran: wajib diisi, maks 20 karakter, tanpa karakter kontrol.
 
 ## Perhitungan Kunci (PRD 6.1)
 

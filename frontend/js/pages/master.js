@@ -24,8 +24,11 @@ const ENTITIES = {
     formFields: [
       { key: 'code', label: 'Kode', required: true, placeholder: 'mis. PRD-006' },
       { key: 'name', label: 'Nama', required: true, placeholder: 'mis. Kertas A3' },
-      { key: 'unit', label: 'Satuan', type: 'select', required: true,
-        options: ['pcs', 'rim', 'pak', 'box', 'lusin', 'unit', 'kg', 'liter'] }
+      // Satuan BEBAS diisi; daftar di bawah hanya saran (datalist), bukan batasan.
+      { key: 'unit', label: 'Satuan', type: 'combo', required: true,
+        placeholder: 'mis. dus, bal, roll…',
+        hint: 'Bebas diisi. Saran yang sering dipakai bisa dipilih dari daftar.',
+        options: () => (state.constants.satuan || []) }
     ],
     showLocation: false
   },
@@ -324,6 +327,7 @@ function openForm(item) {
     wrap.appendChild(label);
 
     let input;
+    let datalist = null;
     if (f.type === 'select') {
       input = document.createElement('select');
       const opts = typeof f.options === 'function' ? f.options() : f.options;
@@ -337,6 +341,21 @@ function openForm(item) {
         opt.textContent = typeof o === 'object' ? o.label : o;
         input.appendChild(opt);
       }
+    } else if (f.type === 'combo') {
+      // Teks bebas + saran (datalist). Nilai di luar daftar tetap diterima.
+      input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = f.placeholder || '';
+      const listId = 'dl-' + f.key + '-' + Math.random().toString(36).slice(2, 8);
+      input.setAttribute('list', listId);
+      datalist = document.createElement('datalist');
+      datalist.id = listId;
+      const opts = typeof f.options === 'function' ? f.options() : (f.options || []);
+      for (const o of opts) {
+        const opt = document.createElement('option');
+        opt.value = typeof o === 'object' ? o.value : o;
+        datalist.appendChild(opt);
+      }
     } else {
       input = document.createElement('input');
       input.type = 'text';
@@ -346,6 +365,13 @@ function openForm(item) {
     if (editing && item[f.key] != null) input.value = item[f.key];
     fields[f.key] = input;
     wrap.appendChild(input);
+    if (datalist) wrap.appendChild(datalist);
+    if (f.hint) {
+      const hintEl = document.createElement('div');
+      hintEl.className = 'hint';
+      hintEl.textContent = f.hint;
+      wrap.appendChild(hintEl);
+    }
     grid.appendChild(wrap);
   }
 

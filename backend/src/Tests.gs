@@ -58,8 +58,11 @@ function systemSelfTest_(params, ctx) {
   check('product: kode duplikat ditolak', 'DUPLICATE', function () {
     return masterCreate_({ entity: 'product', values: { code: 'TEST-P1', name: 'Duplikat', unit: 'pcs' } }, admin);
   });
-  check('product: satuan tidak dikenal ditolak', 'VALIDATION_ERROR', function () {
-    return masterCreate_({ entity: 'product', values: { code: 'TEST-P2', name: 'Satuan Salah', unit: 'karung' } }, admin);
+  check('product: satuan bebas diterima (mis. karung)', true, function () {
+    return track('product', masterCreate_({ entity: 'product', values: { code: 'TEST-P2', name: 'Satuan Bebas', unit: 'karung' } }, admin));
+  });
+  check('product: satuan > 20 karakter ditolak', 'VALIDATION_ERROR', function () {
+    return masterCreate_({ entity: 'product', values: { code: 'TEST-P3', name: 'Satuan Panjang', unit: 'satuan-yang-terlalu-panjang-sekali' } }, admin);
   });
   check('product: kode kosong ditolak', 'VALIDATION_ERROR', function () {
     return masterCreate_({ entity: 'product', values: { code: '', name: 'Tanpa Kode', unit: 'pcs' } }, admin);

@@ -291,6 +291,22 @@ daftar header sehingga data lama tidak bergeser. Sel header kosong diisi; header
 yang berisi nama lain **tidak** ditimpa dan dilaporkan di `conflicts`.
 Balasan: `{ tablesFixed, fixed{}, conflicts[], schemaVersion }`.
 
+### Satuan produk (bebas)
+
+`master.create` / `master.update` / `master.import` menerima **satuan apa pun**
+(teks, maksimal 20 karakter) — tidak lagi dibatasi daftar tetap. Yang divalidasi
+hanya kewajaran:
+
+| Kondisi | Hasil |
+| --- | --- |
+| kosong / hanya spasi | `VALIDATION_ERROR` field `unit` |
+| lebih dari 20 karakter | `VALIDATION_ERROR` field `unit` |
+| mengandung karakter kontrol | `VALIDATION_ERROR` field `unit` |
+| nilai bebas lain (mis. `karung`, `dus`, `Box Besar`) | diterima |
+
+`system.bootstrap` mengirim `constants.satuan` berisi daftar **saran**
+(`SATUAN_UMUM_`) yang dipakai UI sebagai datalist.
+
 ### ED tersedia di
 
 `stock.list` / `stock.available` (`items[].ed`), `shipment.get` & `shipment.list`

@@ -61,8 +61,27 @@ function sortMaster_(items) {
    VALIDASI
    ========================================================= */
 
-/** Cek keunikan nilai sebuah kolom (tidak peka huruf besar/kecil). */
-function assertUnique_(table, field, value, excludeKey) {
+/**
+ * Validasi satuan produk: BEBAS diisi (mis. "dus", "bal", "roll", "meter").
+ *
+ * Dulu satuan dibatasi daftar tetap yang di-hardcode, tetapi kebutuhan lapangan
+ * beragam. Sekarang hanya dijaga kewajarannya supaya tidak merusak tampilan
+ * dan cetakan. Daftar `SATUAN_UMUM_` tetap ada sebagai SARAN di UI, bukan aturan.
+ */
+function assertUnitValid_(unit) {
+  var u = String(unit || '').trim();
+  if (!u) throw apiError_('VALIDATION_ERROR', 'Satuan wajib diisi.', 'unit');
+  if (u.length > 20) {
+    throw apiError_('VALIDATION_ERROR', 'Satuan maksimal 20 karakter (dapat ' + u.length + ').', 'unit');
+  }
+  // Karakter kontrol / baris baru bisa merusak tabel & dokumen cetak.
+  if (/[\u0000-\u001F\u007F]/.test(u)) {
+    throw apiError_('VALIDATION_ERROR', 'Satuan mengandung karakter yang tidak diizinkan.', 'unit');
+  }
+  return u;
+}
+
+/** Cek keunikan nilai sebuah kolom (tidak peka huruf besar/kecil). */function assertUnique_(table, field, value, excludeKey) {
   var target = String(value || '').trim().toUpperCase();
   var rows = readTable_(table);
   for (var i = 0; i < rows.length; i++) {
@@ -112,9 +131,7 @@ function validateMaster_(entity, row, existing) {
     assertRequired_(row.code, 'code', 'Kode produk');
     assertRequired_(row.name, 'name', 'Nama produk');
     assertRequired_(row.unit, 'unit', 'Satuan');
-    if (SATUAN_.indexOf(row.unit) === -1) {
-      throw apiError_('VALIDATION_ERROR', 'Satuan harus salah satu dari: ' + SATUAN_.join(', ') + '.', 'unit');
-    }
+    assertUnitValid_(row.unit);
     assertUnique_('products', 'code', row.code, id);
   }
 
