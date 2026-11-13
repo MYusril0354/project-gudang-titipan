@@ -5,11 +5,23 @@
  * jadi baris yang tidak valid dilaporkan per baris tanpa menggagalkan sisanya.
  */
 
-import { master } from '../api.js';
+import { master, sj } from '../api.js';
 import { el, btn, modal, field, select, toast, callout, badge } from '../ui.js';
 
 /** Kolom yang diharapkan per entity (untuk contoh & petunjuk). */
 const ENTITY_INFO = {
+  sj: {
+    label: 'Surat Jalan',
+    fields: 'no_sj, tanggal, pelanggan, po, produk, qty, batch, ed',
+    sample: 'no_sj,tanggal,pelanggan,po,produk,qty,batch,ed\n'
+      + 'SJ/2026/0101,2026-11-13,SJY,PO-1001,PRD-001,50,BN-20261113-001,2027-06-30\n'
+      + 'SJ/2026/0101,2026-11-13,SJY,PO-1001,PRD-002,20,BN-20261113-002,2027-01-15\n'
+      + 'SJ/2026/0102,2026-11-13,MAB,PO-1002,PRD-003,10,,',
+    note: 'Satu file boleh memuat beberapa SJ: baris dikelompokkan per no_sj. '
+      + 'Kolom batch & ed bersifat RENCANA — stok baru bertambah saat Fisik Ada '
+      + 'dikonfirmasi. Tanggal & ED wajib format YYYY-MM-DD. Pelanggan diisi kode '
+      + 'atau nama; produk diisi kode produk.'
+  },
   product: {
     label: 'Produk',
     fields: 'kode, nama, satuan',
@@ -112,10 +124,26 @@ export function openImportCsv(entity, onDone) {
     resultWrap.innerHTML = '';
 
     try {
-      const res = await master.import(entitySelect.value, csv);
-      renderResult(res);
+      const target = entitySelect.value;
+      const res = target === 'sj'
+        ? await sj.import(csv)
+        : await master.import(target, csv);
+
+      renderResult(res, target);
       submitBtn.disabled = false;
       submitBtn.textContent = 'Impor Lagi';
+
+      if (target === 'sj') {
+        if (res.created > 0 && res.failed === 0) {
+          toast(`${res.created} Surat Jalan diimpor (${res.linesCreated} baris).`, 'ok');
+        } else if (res.created > 0) {
+          toast(`${res.created} SJ dibuat, ${res.failed} baris gagal. Lihat rincian di bawah.`, 'warn');
+        } else {
+          toast(`Tidak ada SJ yang bisa diimpor (${res.failed} baris gagal).`, 'err');
+        }
+        if (res.created > 0 && onDone) await onDone();
+        return;
+      }
 
       if (res.created > 0 && res.failed === 0) {
         toast(`${res.created} ${ENTITY_INFO[res.entity].label.toLowerCase()} berhasil diimpor.`, 'ok');
@@ -134,13 +162,17 @@ export function openImportCsv(entity, onDone) {
   });
 
   /** Ringkasan hasil impor. */
-  function renderResult(res) {
+  function renderResult(res, target) {
     resultWrap.innerHTML = '';
+
+    const summary = target === 'sj'
+      ? `${res.created} SJ dibuat (${res.linesCreated} baris), ${res.failed} baris gagal, dari ${res.rows} baris`
+      : `${res.created} dibuat, ${res.failed} gagal, dari ${res.rows} baris`;
 
     resultWrap.appendChild(el('div', { class: 'row-between', style: { marginBottom: '8px' } }, [
       el('div', {}, [
         el('b', { text: 'Hasil impor: ' }),
-        document.createTextNode(`${res.created} dibuat, ${res.failed} gagal, dari ${res.rows} baris`)
+        document.createTextNode(summary)
       ]),
       el('div', {}, [
         badge(`${res.created} dibuat`, 'b-green'),
@@ -152,6 +184,7 @@ export function openImportCsv(entity, onDone) {
     if (res.errors && res.errors.length) {
       const rows = res.errors.map((e) => el('tr', {}, [
         el('td', { class: 'num', 'data-label': 'Baris', text: String(e.row) }),
+        el('td', { 'data-label': 'SJ', text: e.sj || '—' }),
         el('td', { 'data-label': 'Kode' }, [badge(e.code, 'b-red')]),
         el('td', { 'data-label': 'Pesan', text: e.message })
       ]));
@@ -159,6 +192,7 @@ export function openImportCsv(entity, onDone) {
         el('thead', {}, [
           el('tr', {}, [
             el('th', { class: 'num', text: 'Baris' }),
+            el('th', { text: 'SJ' }),
             el('th', { text: 'Kode' }),
             el('th', { text: 'Pesan' })
           ])

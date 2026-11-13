@@ -108,6 +108,37 @@ function systemHardening_(params, ctx) {
 }
 
 /* =========================================================
+   MIGRASI SKEMA
+   ========================================================= */
+
+/**
+ * Sinkronkan header sheet dengan skema kode (Fase 5+).
+ *
+ * Dipakai setelah kolom baru ditambahkan: kolom baru selalu ditaruh di AKHIR
+ * daftar header sehingga posisi kolom dan seluruh data lama tidak bergeser.
+ * Sel header yang masih kosong diisi; header yang berisi nama lain TIDAK
+ * ditimpa — hanya dilaporkan supaya tidak ada data tertimpa diam-diam.
+ */
+function systemMigrate_(params, ctx) {
+  var result = ensureHeaders_(params.entity || null);
+
+  var fixedTables = Object.keys(result.fixed);
+  if (fixedTables.length) {
+    audit_(ctx, 'system.migrate', 'schema', '', {
+      fixed: result.fixed,
+      conflicts: result.conflicts
+    });
+  }
+
+  return {
+    tablesFixed: fixedTables.length,
+    fixed: result.fixed,
+    conflicts: result.conflicts,
+    schemaVersion: SCHEMA_VERSION_
+  };
+}
+
+/* =========================================================
    BACKUP
    ========================================================= */
 

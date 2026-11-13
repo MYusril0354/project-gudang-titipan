@@ -9,14 +9,14 @@
 
 import { sj } from '../api.js';
 import { state, fmt } from '../state.js';
-import { el, btn, modal, field, select, grid2, toast, kodeTag, sub } from '../ui.js';
+import { el, btn, modal, field, select, grid2, toast } from '../ui.js';
 
 const MAX_LINES = 100;
 
-/** Satu baris draft {productId, qty}. */
+/** Satu baris draft {productId, qty, plannedBatch, plannedEd}. */
 function blankLine() {
   const first = state.master.products[0];
-  return { productId: first ? first.id : '', qty: 1 };
+  return { productId: first ? first.id : '', qty: 1, plannedBatch: '', plannedEd: '' };
 }
 
 export async function openCreateSJ(onDone) {
@@ -42,7 +42,7 @@ export async function openCreateSJ(onDone) {
 
   const dlg = modal({
     title: 'Tambah Penerimaan SJ',
-    sub: 'Dokumen masuk administratif — batch dibuat saat Fisik Ada dikonfirmasi',
+    sub: 'Dokumen masuk administratif — No. Batch & ED di sini adalah RENCANA; stok bertambah saat Fisik Ada dikonfirmasi',
     body: [
       grid2([
         field('No SJ', noInput, 'Disarankan otomatis; boleh diubah, tetap harus unik.', false),
@@ -66,26 +66,39 @@ export async function openCreateSJ(onDone) {
     ]
   });
 
-  /** Render ulang daftar baris (setiap baris: produk, qty, satuan, hapus). */
+  /**
+   * Render ulang daftar baris.
+   * Tiap baris: produk (lebar penuh), lalu qty + No. Batch rencana + ED rencana.
+   * Batch & ED di sini adalah RENCANA — stok baru bertambah saat Fisik Ada
+   * dikonfirmasi, memakai nilai rencana sebagai default.
+   */
   function renderLines() {
     linesWrap.innerHTML = '';
 
     draft.lines.forEach((ln, i) => {
+      const product = state.master.products.find((p) => p.id === ln.productId) || {};
+
       const productSelect = select(
         state.master.products.map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` })),
         ln.productId
       );
-      productSelect.addEventListener('change', () => { draft.lines[i].productId = productSelect.value; });
+      productSelect.addEventListener('change', () => { draft.lines[i].productId = productSelect.value; renderLines(); });
 
       const qtyInput = el('input', {
-        class: 'inline-input', type: 'number', min: '1', value: String(ln.qty),
-        style: { width: '100px' }
+        class: 'inline-input', type: 'number', min: '1', value: String(ln.qty)
       });
       qtyInput.addEventListener('input', () => { draft.lines[i].qty = Number(qtyInput.value); });
 
-      const unitCell = sub(
-        (state.master.products.find((p) => p.id === ln.productId) || {}).unit || ''
-      );
+      const batchInput = el('input', {
+        class: 'inline-input', type: 'text', value: ln.plannedBatch || '',
+        placeholder: 'mis. BN-20261113-001'
+      });
+      batchInput.addEventListener('input', () => { draft.lines[i].plannedBatch = batchInput.value; });
+
+      const edInput = el('input', {
+        class: 'inline-input', type: 'date', value: ln.plannedEd || ''
+      });
+      edInput.addEventListener('change', () => { draft.lines[i].plannedEd = edInput.value; });
 
       const removeBtn = btn('×', {
         variant: 'danger',
@@ -94,29 +107,30 @@ export async function openCreateSJ(onDone) {
         onClick: () => { draft.lines.splice(i, 1); renderLines(); }
       });
 
-      const row = el('tr', {}, [
-        el('td', { class: 'num', text: String(i + 1) }),
-        el('td', {}, [productSelect]),
-        el('td', {}, [qtyInput]),
-        el('td', {}, [unitCell]),
-        el('td', { class: 'num' }, [removeBtn])
-      ]);
-      linesWrap.appendChild(row);
-    });
-
-    const tbl = el('table', { class: 'tbl', style: { marginBottom: '10px' } }, [
-      el('thead', {}, [
-        el('tr', {}, [
-          el('th', { class: 'num', style: { width: '30px' }, text: '#' }),
-          el('th', { text: 'Produk' }),
-          el('th', { style: { width: '120px' }, text: 'Qty' }),
-          el('th', { style: { width: '50px' }, text: 'Satuan' }),
-          el('th', { text: '' })
+      linesWrap.appendChild(el('div', { class: 'sj-line' }, [
+        el('div', { class: 'sj-line-head' }, [
+          el('span', { class: 'sj-line-no', text: `Baris ${i + 1}` }),
+          el('span', { class: 'sub', text: product.unit ? `satuan: ${product.unit}` : '' }),
+          el('span', { class: 'sj-line-spacer' }),
+          removeBtn
+        ]),
+        el('div', { class: 'sj-line-grid' }, [
+          labeled('Produk', productSelect, true),
+          labeled('Qty', qtyInput, true),
+          labeled('No. Batch (rencana)', batchInput, false, 'Boleh dikosongkan; diisi otomatis saat Fisik Ada.'),
+          labeled('ED (rencana)', edInput, false, 'Tanggal kedaluwarsa batch.')
         ])
-      ]),
-      el('tbody', {}, Array.from(linesWrap.children))
-    ]);
-    linesWrap.appendChild(tbl);
+      ]));
+    });
+  }
+
+  /** Bungkus kontrol dengan label kecil untuk tata letak baris SJ. */
+  function labeled(text, control, required, hint) {
+    const wrap = el('div', { class: 'sj-field' });
+    wrap.appendChild(el('label', { text: text + (required ? ' *' : '') }));
+    wrap.appendChild(control);
+    if (hint) wrap.appendChild(el('div', { class: 'hint', text: hint }));
+    return wrap;
   }
 
   renderLines();
@@ -160,10 +174,20 @@ export async function openCreateSJ(onDone) {
         date: dateInput.value,
         customerId: customerSelect.value,
         po,
-        lines: draft.lines.map((l) => ({ productId: l.productId, qty: Number(l.qty) }))
+        lines: draft.lines.map((l) => ({
+          productId: l.productId,
+          qty: Number(l.qty),
+          plannedBatch: (l.plannedBatch || '').trim() || undefined,
+          plannedEd: l.plannedEd || undefined
+        }))
       });
       dlg.close();
-      toast(`Surat Jalan ${res.no} ditambahkan (${res.totalLines} baris).`, 'ok');
+      const withPlan = draft.lines.filter((l) => (l.plannedBatch || '').trim() || l.plannedEd).length;
+      toast(
+        `Surat Jalan ${res.no} ditambahkan (${res.totalLines} baris`
+          + (withPlan ? `, ${withPlan} dengan rencana batch/ED` : '') + ').',
+        'ok'
+      );
       if (onDone) await onDone();
     } catch (err) {
       submitBtn.disabled = false;

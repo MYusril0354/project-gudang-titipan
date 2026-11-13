@@ -43,6 +43,8 @@ export async function openReceive(line, onDone) {
   });
   const dateInput = el('input', { type: 'date', value: state.serverDate || '', required: true });
   const batchInput = el('input', { type: 'text', value: '', placeholder: 'memuat…' });
+  // ED: diisi dari rencana SJ bila ada, boleh diubah; tersimpan pada batch.
+  const edInput = el('input', { type: 'date', value: line.plannedEd || '' });
   const rackSelect = select(
     racks.map((r) => ({ value: r.id, label: `${r.code} — ${r.name}` })),
     racks[0] ? racks[0].id : ''
@@ -75,6 +77,10 @@ export async function openReceive(line, onDone) {
       ]),
       field('No. Batch', batchInput,
         'Nomor batch/lot barang — tampil di stok, kartu stock, pengiriman, dan surat jalan.', true),
+      field('ED (kedaluwarsa)', edInput,
+        line.plannedEd
+          ? 'Terisi dari rencana SJ — boleh diubah.'
+          : 'Opsional. Tampil di stok titipan dan surat jalan.', false),
       grid2([
         field('Lokasi rak tujuan', rackSelect, null, true),
         field('Kondisi', kondisiSelect, null, false)
@@ -87,8 +93,17 @@ export async function openReceive(line, onDone) {
     ]
   });
 
-  /** Ambil saran No. Batch sesuai tanggal yang dipilih (server yang menentukan). */
+  /**
+   * Saran No. Batch sesuai tanggal yang dipilih (server yang menentukan).
+   * Rencana SJ dipakai lebih dulu; saran otomatis hanya bila rencana kosong.
+   */
   async function refreshBatch() {
+    if (line.plannedBatch) {
+      batchInput.value = line.plannedBatch;
+      batchInput.placeholder = '';
+      submitBtn.disabled = false;
+      return;
+    }
     batchInput.value = '';
     batchInput.placeholder = 'memuat…';
     try {
@@ -132,18 +147,24 @@ export async function openReceive(line, onDone) {
         qty,
         date: dateInput.value,
         batchNumber: batchInput.value.trim(),
+        ed: edInput.value || undefined,
         rackId: rackSelect.value,
         kondisi: kondisiSelect.value,
         pic: picInput.value.trim()
       });
       dlg.close();
-      toast(`Batch ${res.batchNumber} disimpan: ${fmt(res.qty)} ${line.unit}.`, 'ok');
+      toast(
+        `Batch ${res.batchNumber} disimpan: ${fmt(res.qty)} ${line.unit}`
+          + (res.ed ? ` · ED ${fmtDate(res.ed)}` : '') + '.',
+        'ok'
+      );
       if (onDone) await onDone();
     } catch (err) {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Konfirmasi Fisik Ada';
       if (err.field === 'qty') markInvalid(qtyInput);
       if (err.field === 'batchNumber') markInvalid(batchInput);
+      if (err.field === 'ed') markInvalid(edInput);
       if (err.field === 'rackId') markInvalid(rackSelect);
       if (err.field === 'date') markInvalid(dateInput);
       if (err.field === 'pic') markInvalid(picInput);

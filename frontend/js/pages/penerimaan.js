@@ -17,6 +17,7 @@ import {
   searchInput, toast, sub, kodeTag, rakTag, batchTag, progressBar
 } from '../ui.js';import { openCreateSJ } from '../modals/sj-create.js';
 import { openReceive, openWait, openCancel } from '../modals/sj.js';
+import { openImportCsv } from '../modals/import.js';
 
 /**
  * Render halaman. Dipanggil main.js pada setiap navigasi.
@@ -42,6 +43,10 @@ export async function renderPenerimaanPage(view) {
         filter.q = v;
         state.filters.penerimaan = v;
         load();
+      }),
+      btn('Impor CSV', {
+        title: 'Impor banyak Surat Jalan dari satu berkas CSV',
+        onClick: () => openImportCsv('sj', load)
       }),
       btn('+ Tambah Penerimaan SJ', {
         variant: 'primary',
@@ -118,6 +123,7 @@ function buildCard(item) {
       el('tr', {}, [
         el('th', { text: 'Produk / Kode' }),
         el('th', { class: 'num', text: 'Qty SJ' }),
+        el('th', { text: 'Rencana Batch / ED' }),
         el('th', { class: 'num', text: 'Diterima · Batch · Rak' }),
         el('th', { class: 'num', text: 'Pending' }),
         el('th', { text: 'Status' }),
@@ -166,6 +172,17 @@ function buildLineRow(sjItem, line) {
   // Pending
   const pendingCell = el('td', { class: 'num', 'data-label': 'Pending' }, [el('b', { text: fmt(line.pending) })]);
 
+  // Rencana batch & ED (diisi saat SJ dibuat; dipakai mengisi form Fisik Ada)
+  const planCell = el('td', { 'data-label': 'Rencana Batch / ED' });
+  if (line.plannedBatch || line.plannedEd) {
+    planCell.appendChild(el('div', {}, [
+      line.plannedBatch ? batchTag(line.plannedBatch) : el('span', { class: 'sub', text: 'batch: —' })
+    ]));
+    planCell.appendChild(el('div', { class: 'sub', text: `ED ${fmtDate(line.plannedEd)}` }));
+  } else {
+    planCell.appendChild(el('span', { class: 'sub', text: '—' }));
+  }
+
   // Status + info alasan/ETA/PIC
   const statusCell = el('td', { 'data-label': 'Status' }, [badge(meta.label, meta.cls)]);
   if (line.status === 'WAITING_PHYSICAL' || line.status === 'PARTIALLY_RECEIVED') {
@@ -191,7 +208,9 @@ function buildLineRow(sjItem, line) {
     customerId: sjItem.customerId,
     alasan: line.alasan,
     eta: line.eta,
-    pic: line.pic
+    pic: line.pic,
+    plannedBatch: line.plannedBatch,
+    plannedEd: line.plannedEd
   };
 
   const canWrite = state.user && (state.user.role === 'ADMIN' || state.user.role === 'GUDANG');
@@ -216,5 +235,5 @@ function buildLineRow(sjItem, line) {
   }
   actions.appendChild(group);
 
-  return el('tr', {}, [productCell, qtyCell, receivedCell, pendingCell, statusCell, actions]);
+  return el('tr', {}, [productCell, qtyCell, planCell, receivedCell, pendingCell, statusCell, actions]);
 }

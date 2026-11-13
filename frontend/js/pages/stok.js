@@ -134,6 +134,9 @@ function buildBatchTable(items) {
       el('b', { class: 'sisa-ok', text: fmt(b.available) }),
       document.createTextNode(` ${b.unit}`)
     ]),
+    el('td', { 'data-label': 'ED' }, [
+      el('span', { text: b.ed ? fmtDate(b.ed) : '—' })
+    ]),
     el('td', { 'data-label': 'Kondisi' }, [el('span', { text: b.kondisi || '—' })])
   ]));
 
@@ -146,6 +149,7 @@ function buildBatchTable(items) {
         el('th', { text: 'Rak' }),
         el('th', { class: 'num', text: 'Qty Masuk' }),
         el('th', { class: 'num', text: 'Sisa' }),
+        el('th', { text: 'ED' }),
         el('th', { text: 'Kondisi' })
       ])
     ]),

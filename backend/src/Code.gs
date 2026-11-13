@@ -33,6 +33,7 @@ var ROUTES = {
   /* --- self-test & hardening (ADMIN) --- */
   'system.selfTest': { fn: systemSelfTest_, roles: [ROLES.ADMIN], write: true },
   'system.hardening': { fn: systemHardening_, roles: [ROLES.ADMIN], write: true },
+  'system.migrate': { fn: systemMigrate_, roles: [ROLES.ADMIN], write: true },
   'system.backupDatabase': { fn: backupDatabase_, roles: [ROLES.ADMIN], write: true },
   'system.backupStatus': { fn: backupStatus_, roles: [ROLES.ADMIN], write: false },
   'error.list': { fn: errorList_, roles: [ROLES.ADMIN], write: false },
@@ -53,6 +54,7 @@ var ROUTES = {
   'sj.line.receive': { fn: sjLineReceive_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.line.wait': { fn: sjLineWait_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.line.cancel': { fn: sjLineCancel_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
+  'sj.import': { fn: sjImport_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'pending.list': { fn: pendingList_, roles: null, write: false },
 
   /* --- stok --- */

@@ -12,6 +12,243 @@
 /** Batas jumlah baris dalam satu SJ. */
 var SJ_MAX_LINES = 100;
 
+/** Batas baris per impor CSV Surat Jalan. */
+var SJ_IMPORT_MAX_ROWS = 1000;
+
+/** Nama kolom yang dikenali pada header CSV Surat Jalan (Indonesia & Inggris). */
+var SJ_IMPORT_ALIASES_ = {
+  no_sj: ['no_sj', 'no sj', 'nosj', 'nomor sj', 'sj', 'surat jalan'],
+  tanggal: ['tanggal', 'date', 'tgl'],
+  pelanggan: ['pelanggan', 'customer', 'kode pelanggan', 'customer code'],
+  po: ['po', 'no po', 'nomor po', 'no_po'],
+  produk: ['produk', 'kode produk', 'product', 'product code', 'kode'],
+  qty: ['qty', 'jumlah', 'quantity', 'kuantitas'],
+  batch: ['batch', 'no batch', 'no. batch', 'nomor batch', 'batch_number', 'planned_batch'],
+  ed: ['ed', 'expired', 'expiry', 'kadaluarsa', 'tgl ed', 'tanggal ed']
+};
+
+/** Urutan kolom bila CSV tidak menyertakan baris header. */
+var SJ_IMPORT_ORDER_ = ['no_sj', 'tanggal', 'pelanggan', 'po', 'produk', 'qty', 'batch', 'ed'];
+
+/** Tanggal CSV valid (format + kewajaran). */
+function isValidImportDate_(s) {
+  try { assertDate_(s); return true; } catch (e) { return false; }
+}
+
+/** Cocokkan judul kolom CSV SJ ke nama field internal, atau null. */
+function sjImportFieldOf_(title) {
+  var t = String(title || '').trim().toLowerCase();
+  var keys = Object.keys(SJ_IMPORT_ALIASES_);
+  for (var i = 0; i < keys.length; i++) {
+    if (SJ_IMPORT_ALIASES_[keys[i]].indexOf(t) !== -1) return keys[i];
+  }
+  return null;
+}
+
+/**
+ * Impor Surat Jalan dari CSV (satu file boleh memuat banyak SJ).
+ *
+ * Baris dikelompokkan berdasarkan `no_sj`; tiap kelompok menjadi satu dokumen
+ * SJ dengan beberapa baris produk. Kolom `batch` dan `ed` bersifat RENCANA —
+ * stok tidak bertambah di sini, batch baru lahir saat Fisik Ada dikonfirmasi.
+ *
+ * Kolom: no_sj, tanggal, pelanggan, po, produk, qty, batch, ed
+ *
+ * @param {Object} params { csv }
+ * @returns {Object} ringkasan per dokumen + daftar kegagalan per baris
+ */
+function sjImport_(params, ctx) {
+  var csv = String(params.csv || '');
+  if (!csv.trim()) throw apiError_('VALIDATION_ERROR', 'Isi CSV masih kosong.', 'csv');
+
+  var matrix = parseCsv_(csv);
+  if (!matrix.length) {
+    throw apiError_('VALIDATION_ERROR', 'Tidak ada baris data yang bisa dibaca.', 'csv');
+  }
+
+  var headerFields = matrix[0].map(sjImportFieldOf_);
+  var hasHeader = headerFields.some(function (f) { return f !== null; });
+
+  var fields = hasHeader ? headerFields : SJ_IMPORT_ORDER_;
+  var dataRows = hasHeader ? matrix.slice(1) : matrix;
+
+  if (!dataRows.length) {
+    throw apiError_('VALIDATION_ERROR', 'CSV hanya berisi baris header.', 'csv');
+  }
+  if (dataRows.length > SJ_IMPORT_MAX_ROWS) {
+    throw apiError_('VALIDATION_ERROR',
+      'Maksimal ' + SJ_IMPORT_MAX_ROWS + ' baris per impor (dikirim ' + dataRows.length + ').', 'csv');
+  }
+
+  // Susun objek per baris lebih dulu.
+  var parsed = dataRows.map(function (cells, idx) {
+    var row = {};
+    if (hasHeader) {
+      for (var c = 0; c < fields.length; c++) {
+        if (fields[c]) row[fields[c]] = cells[c] !== undefined ? cells[c] : '';
+      }
+    } else {
+      for (var d = 0; d < fields.length; d++) {
+        row[SJ_IMPORT_ORDER_[d]] = cells[d] !== undefined ? cells[d] : '';
+      }
+    }
+    row.__row = hasHeader ? idx + 2 : idx + 1;
+    return row;
+  });
+
+  // Kelompokkan per nomor SJ, mempertahankan urutan kemunculan.
+  var order = [];
+  var groups = {};
+  parsed.forEach(function (r) {
+    var no = String(r.no_sj || '').trim().toUpperCase();
+    var key = no || '__tanpa_nomor_' + r.__row;
+    if (!groups[key]) {
+      groups[key] = { no: no, rows: [] };
+      order.push(key);
+    }
+    groups[key].rows.push(r);
+  });
+
+  var created = [];
+  var failed = [];
+  var createdLines = 0;
+
+  // Peta kode -> id agar pencarian pelanggan/produk tidak membaca sheet berulang.
+  var customers = readTable_('customers');
+  var products = readTable_('products');
+
+  function findCustomerId_(ref) {
+    var v = String(ref || '').trim().toUpperCase();
+    if (!v) return '';
+    for (var i = 0; i < customers.length; i++) {
+      if (String(customers[i].id).toUpperCase() === v) return customers[i].id;
+      if (String(customers[i].code || '').toUpperCase() === v) return customers[i].id;
+      if (String(customers[i].name || '').trim().toUpperCase() === v) return customers[i].id;
+    }
+    return '';
+  }
+
+  function findProductId_(ref) {
+    var v = String(ref || '').trim().toUpperCase();
+    if (!v) return '';
+    for (var i = 0; i < products.length; i++) {
+      if (String(products[i].id).toUpperCase() === v) return products[i].id;
+      if (String(products[i].code || '').toUpperCase() === v) return products[i].id;
+    }
+    return '';
+  }
+
+  order.forEach(function (key) {
+    var g = groups[key];
+    var first = g.rows[0];
+
+    // Header dokumen diambil dari baris pertama kelompok.
+    var date = String(first.tanggal || '').trim();
+    var customerId = findCustomerId_(first.pelanggan);
+    var po = String(first.po || '').trim();
+    var no = g.no;
+
+    if (!date) {
+      failed.push({ row: first.__row, sj: no || '(tanpa nomor)', code: 'VALIDATION_ERROR', message: 'Kolom tanggal wajib diisi.' });
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isValidImportDate_(date)) {
+      failed.push({ row: first.__row, sj: no || '(tanpa nomor)', code: 'VALIDATION_ERROR', message: 'Tanggal tidak valid (dapat "' + date + '"); gunakan YYYY-MM-DD yang benar.' });
+      return;
+    }
+    if (!customerId) {
+      failed.push({ row: first.__row, sj: no || '(tanpa nomor)', code: 'NOT_FOUND', message: 'Pelanggan "' + first.pelanggan + '" tidak ditemukan (isi kode atau nama pelanggan).' });
+      return;
+    }
+    if (!po) {
+      failed.push({ row: first.__row, sj: no || '(tanpa nomor)', code: 'VALIDATION_ERROR', message: 'Kolom PO wajib diisi.' });
+      return;
+    }
+    if (no && readTableWhere_('sj', { no: no }).length) {
+      failed.push({ row: first.__row, sj: no, code: 'DUPLICATE', message: 'No SJ "' + no + '" sudah ada.' });
+      return;
+    }
+
+    // Susun baris; baris yang produknya tidak dikenal dilaporkan terpisah.
+    var lines = [];
+    var rowErrors = [];
+    g.rows.forEach(function (r) {
+      var productId = findProductId_(r.produk);
+      if (!productId) {
+        rowErrors.push({ row: r.__row, sj: no || '(tanpa nomor)', code: 'NOT_FOUND', message: 'Produk "' + r.produk + '" tidak ditemukan.' });
+        return;
+      }
+      var qty = parseInt(r.qty, 10);
+      if (!isFinite(qty) || qty < 1) {
+        rowErrors.push({ row: r.__row, sj: no || '(tanpa nomor)', code: 'VALIDATION_ERROR', message: 'Qty tidak valid ("' + r.qty + '").' });
+        return;
+      }
+      var ed = String(r.ed || '').trim();
+      if (ed && (!/^\d{4}-\d{2}-\d{2}$/.test(ed) || !isValidImportDate_(ed))) {
+        rowErrors.push({ row: r.__row, sj: no || '(tanpa nomor)', code: 'VALIDATION_ERROR', message: 'ED tidak valid (dapat "' + ed + '"); gunakan YYYY-MM-DD yang benar.' });
+        return;
+      }
+      lines.push({
+        productId: productId,
+        qty: qty,
+        plannedBatch: String(r.batch || '').trim().toUpperCase(),
+        plannedEd: ed
+      });
+    });
+
+    if (!lines.length) {
+      failed.push({
+        row: first.__row,
+        sj: no || '(tanpa nomor)',
+        code: 'VALIDATION_ERROR',
+        message: 'Tidak ada baris valid pada dokumen ini' + (rowErrors.length ? ' (' + rowErrors.length + ' baris gagal)' : '') + '.'
+      });
+      rowErrors.forEach(function (e) { failed.push(e); });
+      return;
+    }
+
+    try {
+      var result = sjCreate_({
+        no: no || undefined,
+        date: date,
+        customerId: customerId,
+        po: po,
+        lines: lines
+      }, ctx);
+      created.push({ no: result.no, lines: lines.length });
+      createdLines += lines.length;
+      rowErrors.forEach(function (e) { failed.push(e); });
+    } catch (groupErr) {
+      failed.push({
+        row: first.__row,
+        sj: no || '(tanpa nomor)',
+        code: groupErr.code || 'INTERNAL',
+        message: groupErr.message || 'Dokumen gagal dibuat.'
+      });
+    }
+  });
+
+  audit_(ctx, 'sj.import', 'sj', '', {
+    documents: order.length,
+    created: created.length,
+    lines: createdLines,
+    failed: failed.length,
+    header: hasHeader
+  });
+
+  return {
+    headerDetected: hasHeader,
+    fields: fields,
+    rows: dataRows.length,
+    documents: order.length,
+    created: created.length,
+    linesCreated: createdLines,
+    failed: failed.length,
+    documents_created: created,
+    errors: failed.slice(0, 60)
+  };
+}
+
 /** Kondisi barang yang dikenal (PRD temuan #4). */
 var KONDISI_ = ['Baik', 'Rusak sebagian'];
 
@@ -89,6 +326,9 @@ function sjLineView_(line, ds) {
     alasanLabel: ALASAN_[line.alasan] || '',
     eta: line.eta || '',
     pic: line.pic || '',
+    /** Rencana yang diisi saat SJ dibuat — dipakai untuk mengisi form Fisik Ada. */
+    plannedBatch: line.planned_batch || '',
+    plannedEd: line.planned_ed || '',
     status: lineStatus_(line, receipts),
     receipts: receipts.map(function (r) {
       var rack = ds.racksById[String(r.rack_id)] || {};
@@ -100,7 +340,8 @@ function sjLineView_(line, ds) {
         date: r.date,
         pic: r.pic || '',
         batchNumber: r.batch_number || '',
-        kondisi: r.kondisi || ''
+        kondisi: r.kondisi || '',
+        ed: r.ed || ''
       };
     })
   };
@@ -320,6 +561,9 @@ function pendingRows_(ds) {
         alasanLabel: ALASAN_[line.alasan] || '',
         eta: line.eta || '',
         pic: line.pic || '',
+        // Rencana batch & ED dari baris SJ — dipakai mengisi form Fisik Ada.
+        plannedBatch: line.planned_batch || '',
+        plannedEd: line.planned_ed || '',
         umurDays: agingDays_(s.date)
       });
     });
@@ -406,7 +650,23 @@ function sjCreate_(params, ctx) {
     if (!knownProducts[productId]) {
       throw apiError_('NOT_FOUND', 'Produk baris ' + (i + 1) + ' tidak ditemukan.', 'lines[' + i + '].productId');
     }
-    return { productId: productId, qty: assertPositiveInt_(ln.qty, 'lines[' + i + '].qty', 1) };
+
+    // Rencana batch & ED (opsional). Stok TIDAK bertambah di sini — batch baru
+    // lahir saat Fisik Ada dikonfirmasi, memakai nilai rencana ini sebagai default.
+    var plannedBatch = String(ln.plannedBatch || '').trim().toUpperCase();
+    var plannedEd = ln.plannedEd ? assertDate_(ln.plannedEd, 'lines[' + i + '].plannedEd') : '';
+    if (plannedEd && String(plannedEd) < String(date)) {
+      throw apiError_('VALIDATION_ERROR',
+        'ED baris ' + (i + 1) + ' tidak boleh sebelum tanggal SJ (' + date + ').',
+        'lines[' + i + '].plannedEd');
+    }
+
+    return {
+      productId: productId,
+      qty: assertPositiveInt_(ln.qty, 'lines[' + i + '].qty', 1),
+      plannedBatch: plannedBatch,
+      plannedEd: plannedEd
+    };
   });
 
   var no = String(params.no || '').trim().toUpperCase();
@@ -442,6 +702,8 @@ function sjCreate_(params, ctx) {
       alasan: '',
       eta: '',
       pic: '',
+      planned_batch: p.plannedBatch,
+      planned_ed: p.plannedEd,
       created_at: now,
       created_by: ctx.username,
       updated_at: now,
@@ -525,12 +787,20 @@ function sjLineReceive_(params, ctx) {
       'Tanggal fisik tidak boleh sebelum tanggal SJ (' + sj.date + ').', 'date');
   }
 
-  // No. Batch: kosong = dibuat otomatis dari counter (dalam lock).
-  var batchNumber = String(params.batchNumber || '').trim().toUpperCase();
+  // No. Batch: pakai kiriman, kalau kosong pakai RENCANA dari baris SJ,
+  // kalau masih kosong baru dibuat otomatis dari counter (dalam lock).
+  var batchNumber = String(params.batchNumber || line.planned_batch || '').trim().toUpperCase();
   if (batchNumber) {
     assertBatchUnique_(batchNumber, null);
   } else {
     batchNumber = nextBatchNumber_(date);
+  }
+
+  // ED: pakai kiriman, kalau kosong pakai RENCANA dari baris SJ.
+  var ed = params.ed ? assertDate_(params.ed, 'ed') : (line.planned_ed || '');
+  if (ed && String(ed) < String(date)) {
+    throw apiError_('VALIDATION_ERROR',
+      'ED tidak boleh sebelum tanggal penerimaan (' + date + ').', 'ed');
   }
 
   var consign = consignOf_(sj.customer_id);
@@ -558,6 +828,7 @@ function sjLineReceive_(params, ctx) {
     pic: pic,
     batch_number: batchNumber,
     kondisi: kondisi,
+    ed: ed,
     created_at: now,
     created_by: ctx.username,
     updated_at: now,
@@ -598,6 +869,7 @@ function sjLineReceive_(params, ctx) {
     sjNo: sjNo,
     lineId: lineId,
     batchNumber: batchNumber,
+    ed: ed,
     qty: qty,
     pendingAfter: pendingAfter,
     lineStatus: lineStatus_(Object.assign({}, line, patch), receiptsAfter),

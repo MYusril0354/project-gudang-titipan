@@ -10,6 +10,9 @@
 /** Nama Script Property untuk ID spreadsheet database. */
 var PROP_SPREADSHEET_ID = 'SPREADSHEET_ID';
 
+/** Versi skema data — naikkan saat HEADERS_ berubah (dipakai system.migrate). */
+var SCHEMA_VERSION_ = '2';
+
 /** Nama sheet sesuai model data (PRD bagian 10). */
 var TABLES_ = [
   'users', 'sessions', 'products', 'customers', 'locations', 'racks',
@@ -27,8 +30,11 @@ var HEADERS_ = {
   locations: ['id', 'type', 'name', 'customer_id', 'created_at', 'created_by', 'updated_at', 'updated_by'],
   racks: ['id', 'code', 'name', 'location_id', 'created_at', 'created_by', 'updated_at', 'updated_by'],
   sj: ['no', 'date', 'customer_id', 'po', 'status_cache', 'created_at', 'created_by', 'updated_at', 'updated_by'],
-  sj_lines: ['id', 'sj_no', 'product_id', 'qty_sj', 'qty_cancelled', 'decision', 'alasan', 'eta', 'pic', 'created_at', 'created_by', 'updated_at', 'updated_by'],
-  receipts: ['id', 'sj_line_id', 'qty', 'rack_id', 'date', 'pic', 'batch_number', 'kondisi', 'created_at', 'created_by', 'updated_at', 'updated_by'],
+  // `planned_batch`/`planned_ed` = RENCANA batch & ED yang diisi saat SJ dibuat.
+  // Ditaruh di AKHIR agar posisi kolom data lama tidak bergeser (lihat ensureHeaders_).
+  sj_lines: ['id', 'sj_no', 'product_id', 'qty_sj', 'qty_cancelled', 'decision', 'alasan', 'eta', 'pic', 'created_at', 'created_by', 'updated_at', 'updated_by', 'planned_batch', 'planned_ed'],
+  // `ed` = tanggal kedaluwarsa batch yang BENAR-BENAR diterima (diisi saat Fisik Ada).
+  receipts: ['id', 'sj_line_id', 'qty', 'rack_id', 'date', 'pic', 'batch_number', 'kondisi', 'created_at', 'created_by', 'updated_at', 'updated_by', 'ed'],
   cancellations: ['id', 'sj_line_id', 'qty', 'reason', 'note', 'date', 'created_at', 'created_by', 'updated_at', 'updated_by'],
   shipments: ['no', 'date', 'customer_id', 'status', 'pod_date', 'driver', 'vehicle', 'note', 'print_count', 'last_printed_at', 'created_at', 'created_by', 'updated_at', 'updated_by'],
   shipment_lines: ['id', 'shipment_no', 'product_id', 'rack_id', 'qty', 'created_at', 'created_by', 'updated_at', 'updated_by'],
@@ -45,8 +51,8 @@ var HEADERS_ = {
  */
 var DATE_COLS_ = {
   sj: ['date'],
-  sj_lines: ['eta'],
-  receipts: ['date'],
+  sj_lines: ['eta', 'planned_ed'],
+  receipts: ['date', 'ed'],
   cancellations: ['date'],
   shipments: ['date', 'pod_date'],
   movements: ['date']
@@ -218,6 +224,49 @@ function ensureAllTables_() {
     sheet_(name);
   });
   return created;
+}
+
+/**
+ * Samakan header sheet dengan HEADERS_ pada kode.
+ *
+ * Dipakai saat skema bertambah kolom: kolom baru selalu ditaruh di AKHIR daftar
+ * sehingga posisi kolom lama (dan seluruh data lama) tidak bergeser. Sel header
+ * yang masih kosong diisi; sel yang berisi nama lain TIDAK ditimpa, hanya
+ * dilaporkan agar tidak ada data yang tertimpa diam-diam.
+ *
+ * @param {string} [only] nama tabel; kosong = semua tabel
+ * @returns {{fixed: Object, conflicts: string[]}}
+ */
+function ensureHeaders_(only) {
+  var fixed = {};
+  var conflicts = [];
+  var names = only ? [only] : TABLES_;
+
+  names.forEach(function (name) {
+    var headers = HEADERS_[name];
+    if (!headers) return;
+
+    var sh = sheet_(name);
+    var width = Math.max(sh.getLastColumn() || 0, headers.length);
+    var actual = sh.getRange(1, 1, 1, width).getValues()[0];
+    var added = [];
+
+    for (var i = 0; i < headers.length; i++) {
+      var current = String(actual[i] === null || actual[i] === undefined ? '' : actual[i]).trim();
+      if (current === headers[i]) continue;
+
+      if (current === '') {
+        sh.getRange(1, i + 1).setValue(headers[i]);
+        added.push(headers[i]);
+      } else {
+        conflicts.push(name + '!' + (i + 1) + ': kode="' + headers[i] + '" sheet="' + current + '"');
+      }
+    }
+
+    if (added.length) fixed[name] = added;
+  });
+
+  return { fixed: fixed, conflicts: conflicts };
 }
 
 /**

@@ -21,12 +21,27 @@ function nowStamp_() {
   return Utilities.formatDate(new Date(), TZ_, 'yyyy-MM-dd HH:mm:ss');
 }
 
-/** Validasi format tanggal YYYY-MM-DD; lempar VALIDATION_ERROR bila salah. */
+/**
+ * Validasi format tanggal YYYY-MM-DD **dan** kewajarannya.
+ * Pola saja tidak cukup: "2026-13-99" lolos regex tapi bukan tanggal.
+ */
 function assertDate_(value, field) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+  var s = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     throw apiError_('VALIDATION_ERROR', 'Format tanggal harus YYYY-MM-DD.', field || 'date');
   }
-  return value;
+
+  var y = parseInt(s.slice(0, 4), 10);
+  var m = parseInt(s.slice(5, 7), 10);
+  var d = parseInt(s.slice(8, 10), 10);
+  var probe = new Date(Date.UTC(y, m - 1, d));
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) {
+    throw apiError_('VALIDATION_ERROR', 'Tanggal tidak valid: ' + s + '.', field || 'date');
+  }
+  if (y < 2000 || y > 2100) {
+    throw apiError_('VALIDATION_ERROR', 'Tahun di luar rentang wajar (2000-2100): ' + s + '.', field || 'date');
+  }
+  return s;
 }
 
 /** Validasi integer positif (>= min). */

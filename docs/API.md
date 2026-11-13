@@ -87,6 +87,7 @@ Satu-satunya action yang juga menerima `GET`: `GET {GAS_EXEC_URL}?action=system.
 | `sj.line.receive` | ADMIN, GUDANG | ✓ | Fisik Ada → receipt + batch + mutasi IN |
 | `sj.line.wait` | ADMIN, GUDANG | ✓ | Fisik Belum Ada (alasan, ETA, PIC) |
 | `sj.line.cancel` | ADMIN, GUDANG | ✓ | Batalkan sisa |
+| `sj.import` | ADMIN, GUDANG | ✓ | Impor banyak Surat Jalan dari satu CSV (dikelompokkan per `no_sj`) |
 | `pending.list` | semua | – | Antrean pending + bucket umur |
 | `stock.list` | semua | – | Stok per batch + ringkasan per pelanggan |
 | `stock.available` | ADMIN, GUDANG | – | Batch tersedia untuk satu pelanggan |
@@ -222,3 +223,76 @@ totals{exceptionRows,movements,batches,shipments,sj}`.
 `user.list` / `user.create` / `user.update` / `user.resetPassword` dan
 `audit.list` (ADMIN). `audit.list` menerima `q`, `page`, `pageSize` dan
 mengembalikan `{ items[], page, pageSize, total, totalPages }`.
+
+## 7. Batch & ED (rencana), Impor SJ, Migrasi Skema
+
+### Dua tahap: rencana → batch nyata
+
+`receipts.ed` = ED batch yang **benar-benar** diterima.
+`sj_lines.planned_batch` & `sj_lines.planned_ed` = **rencana** yang diisi saat SJ
+dibuat/diimpor. **Rencana tidak menambah stok**; batch lahir saat Fisik Ada
+dikonfirmasi, memakai nilai rencana sebagai default yang boleh diubah.
+
+### `sj.create` (dengan rencana)
+
+```json
+{ "action": "sj.create", "params": {
+  "date": "2026-11-13", "customerId": "<id>", "po": "PO-1001",
+  "lines": [
+    { "productId": "<id>", "qty": 50,
+      "plannedBatch": "BN-20261113-001", "plannedEd": "2027-06-30" }
+  ] } }
+```
+
+`plannedBatch` & `plannedEd` opsional. Bila `plannedEd` diisi, tidak boleh
+sebelum tanggal SJ.
+
+### `sj.line.receive` (memakai rencana sebagai default)
+
+```json
+{ "action": "sj.line.receive", "params": {
+  "sjNo": "SJ/2026/0001", "lineId": "<id>", "qty": 50,
+  "date": "2026-11-13", "rackId": "<id>", "kondisi": "Baik", "pic": "Andi",
+  "batchNumber": "BN-20261113-001", "ed": "2027-06-30" } }
+```
+
+`batchNumber` dan `ed` boleh dikosongkan: server memakai `planned_batch` /
+`planned_ed` dari baris SJ; bila rencana juga kosong, No. Batch dibuat otomatis
+dari counter. ED tidak boleh sebelum tanggal penerimaan. Balasan menyertakan
+`batchNumber` dan `ed` yang tersimpan.
+
+### `sj.import`
+
+```json
+{ "action": "sj.import", "params": { "csv": "no_sj,tanggal,pelanggan,po,produk,qty,batch,ed\nSJ/2026/0101,2026-11-13,SJY,PO-1001,PRD-001,50,BN-20261113-001,2027-06-30\nSJ/2026/0101,2026-11-13,SJY,PO-1001,PRD-002,20,BN-20261113-002,2027-01-15" } }
+```
+
+- Kolom: `no_sj, tanggal, pelanggan, po, produk, qty, batch, ed`.
+- Baris dikelompokkan per `no_sj`; **satu file boleh memuat banyak SJ**.
+- `pelanggan` diisi kode **atau** nama; `produk` diisi kode produk.
+- `tanggal` & `ed` wajib `YYYY-MM-DD` **dan tanggal yang benar** (2026-13-99 ditolak).
+- Header opsional; tanpa header urutan kolom mengikuti daftar di atas.
+- `batch` & `ed` bersifat rencana (stok tidak bertambah).
+- No SJ yang sudah ada ditolak (`DUPLICATE`) dan dilaporkan per dokumen.
+- Baris gagal dilaporkan per baris tanpa menggagalkan sisanya.
+- Maksimal 1000 baris per impor.
+
+Balasan: `{ headerDetected, fields, rows, documents, created, linesCreated,
+failed, documents_created[], errors[{row,sj,code,message}] }`.
+
+### `system.migrate`
+
+```json
+{ "action": "system.migrate", "params": {} }
+```
+
+Menyamakan header sheet dengan skema kode. Kolom baru selalu ditaruh di **akhir**
+daftar header sehingga data lama tidak bergeser. Sel header kosong diisi; header
+yang berisi nama lain **tidak** ditimpa dan dilaporkan di `conflicts`.
+Balasan: `{ tablesFixed, fixed{}, conflicts[], schemaVersion }`.
+
+### ED tersedia di
+
+`stock.list` / `stock.available` (`items[].ed`), `shipment.get` & `shipment.list`
+(`lines[].ed`), dan `shipment.printData` (`lines[].ed`) — ikut tercetak pada
+kolom **ED** di surat jalan.

@@ -124,6 +124,7 @@ function batchView_(receipt, ds) {
     id: receipt.id,
     batchNumber: receipt.batch_number || '',
     date: receipt.date,
+    ed: receipt.ed || '',
     qtyIn: Number(receipt.qty || 0),
     available: batchAvailable_(receipt, consumptions, ds.shipments),
     kondisi: receipt.kondisi || '',

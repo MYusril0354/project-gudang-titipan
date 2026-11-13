@@ -69,6 +69,8 @@ function setupAll(spreadsheetId, adminPassword, adminUsername) {
 
   result.properties = setupProperties_(spreadsheetId, false);
   result.tables = setupTables_();
+  // Samakan header dengan skema kode (kolom baru selalu di akhir).
+  result.schema = ensureHeaders_();
   result.admin = seedAdmin_(adminUsername || 'admin', adminPassword || 'admin123');
   result.company = seedCompany_();
   result.counters = seedCounters_();

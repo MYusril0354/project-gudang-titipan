@@ -56,6 +56,37 @@ yang diganti.
   menunggu spreadsheet + deployment produksi
 - Polish opsional: pencarian global, soft-undo void
 
+## Tambahan setelah Fase 5 — Batch/ED & Impor SJ
+
+Permintaan pengguna: Penerimaan SJ bisa impor CSV, dan bisa langsung mengisi
+No. Batch & ED.
+
+**Keputusan yang diambil (dikonfirmasi pengguna sebelum eksekusi):**
+Batch & ED yang diisi saat SJ dibuat bersifat **RENCANA** — stok **tidak**
+bertambah; batch baru lahir saat Fisik Ada dikonfirmasi. Tidak ada peringatan
+kedaluwarsa otomatis. Impor CSV boleh memuat banyak SJ dalam satu berkas.
+
+- **Skema (versi 2)** — `sj_lines.planned_batch`, `sj_lines.planned_ed`,
+  `receipts.ed`. Semua kolom baru ditaruh di **akhir** `HEADERS_` supaya posisi
+  kolom dan data lama tidak bergeser.
+- **`system.migrate`** (ADMIN) — menuliskan header yang belum ada; header yang
+  berbentrok tidak ditimpa, hanya dilaporkan.
+- **`sj.create`** menerima `plannedBatch`/`plannedEd` per baris (ED tidak boleh
+  sebelum tanggal SJ).
+- **`sj.line.receive`** menerima `ed`, dan memakai rencana sebagai default bila
+  `batchNumber`/`ed` dikosongkan.
+- **`sj.import`** — impor CSV banyak SJ sekaligus, dikelompokkan per `no_sj`,
+  laporan kegagalan per baris.
+- **Frontend** — modal Tambah SJ kini punya field No. Batch & ED per baris
+  (tata letak kartu, responsif); modal Fisik Ada terisi otomatis dari rencana;
+  kolom **Rencana Batch / ED** di tabel Penerimaan; kolom **ED** di Stok Titipan;
+  jenis impor **Surat Jalan** di modal Impor CSV; kolom ED di cetakan surat jalan.
+
+**Bug yang ditemukan & diperbaiki saat pengerjaan:** `assertDate_` hanya
+memeriksa pola, sehingga tanggal mustahil seperti `2026-13-99` atau `2026-02-30`
+lolos. Sekarang tanggal benar-benar divalidasi (termasuk rentang tahun
+2000–2100), dan impor melaporkannya per baris.
+
 ## Fase 4 — Selesai
 
 - `dashboard.summary` — 4 kartu (stok, pending fisik, SJ belum selesai, belum POD),

@@ -193,7 +193,8 @@ export const sj = {
   suggestBatch: (date) => api('sj.line.suggestBatch', { date }),
   receive: (payload) => api('sj.line.receive', payload, { write: true }),
   wait: (payload) => api('sj.line.wait', payload, { write: true }),
-  cancel: (payload) => api('sj.line.cancel', payload, { write: true })
+  cancel: (payload) => api('sj.line.cancel', payload, { write: true }),
+  import: (csv) => api('sj.import', { csv }, { write: true })
 };
 
 export const pending = {

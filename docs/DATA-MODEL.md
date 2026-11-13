@@ -14,8 +14,8 @@ Kolom `id` diisi server. Semua tabel punya `created_at`, `created_by`, `updated_
 | `locations` | id, type (MAIN/CONSIGN), name, customer_id |
 | `racks` | id, code (unik), name, location_id |
 | `sj` | no (unik), date, customer_id, po, status_cache |
-| `sj_lines` | id, sj_no, product_id, qty_sj, qty_cancelled, decision (OPEN/WAITING/DONE), alasan, eta, pic |
-| `receipts` | id, sj_line_id, qty, rack_id, date, pic, batch_number, kondisi |
+| `sj_lines` | id, sj_no, product_id, qty_sj, qty_cancelled, decision (OPEN/WAITING/DONE), alasan, eta, pic, **planned_batch**, **planned_ed** |
+| `receipts` | id, sj_line_id, qty, rack_id, date, pic, batch_number, kondisi, **ed** |
 | `cancellations` | id, sj_line_id, qty, reason, note, date |
 | `shipments` | no (unik), date, customer_id, status, pod_date, driver, vehicle, note, print_count, last_printed_at |
 | `shipment_lines` | id, shipment_no, product_id, rack_id, qty |
@@ -39,6 +39,8 @@ Header lengkap tiap tabel ada di `backend/src/Db.gs` (`HEADERS_`).
 3. **`status_cache` pada `sj`** hanya untuk mempercepat daftar; nilai kebenarannya tetap dihitung dari baris (`Domain.gs`).
 4. **Nomor dokumen dari `counters`**, bukan dari jumlah baris — prototipe memakai `jumlah DO + 1` yang bisa bentrok bila ada data dihapus (temuan #8).
 5. **Satu pelanggan = satu gudang titipan** (aturan PRD 6.6). Gudang bertipe `MAIN` tidak terkait pelanggan.
+6. **Batch & ED punya dua tahap.** Saat SJ dibuat/impor, `planned_batch` & `planned_ed` diisi sebagai **rencana** — stok **tidak** bertambah. Batch dan ED yang benar-benar diterima disimpan di `receipts` (`batch_number`, `ed`) saat Fisik Ada dikonfirmasi, dengan nilai rencana sebagai default yang boleh diubah.
+7. **Kolom baru selalu ditambahkan di AKHIR** daftar `HEADERS_` supaya posisi kolom (dan seluruh data lama) tidak bergeser. Setelah menambah kolom, jalankan `system.migrate` (ADMIN) untuk menuliskan header yang belum ada; header yang sudah berisi nama lain **tidak** ditimpa, hanya dilaporkan sebagai konflik.
 
 ## Perhitungan Kunci (PRD 6.1)
 

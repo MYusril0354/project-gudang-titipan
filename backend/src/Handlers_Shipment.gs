@@ -25,6 +25,7 @@ function shipmentLineView_(line, ds) {
 
   var cons = ds.consumptionsByLine ? (ds.consumptionsByLine[String(line.id)] || []) : [];
   var first = cons[0] || {};
+  var receipt = first.receipt_id ? (ds.receiptsById[String(first.receipt_id)] || {}) : {};
 
   return {
     id: line.id,
@@ -37,6 +38,7 @@ function shipmentLineView_(line, ds) {
     qty: Number(line.qty || 0),
     receiptId: first.receipt_id || '',
     batchNumber: first.batch_number || '',
+    ed: receipt.ed || '',
     sjNo: first.sj_no || ''
   };
 }
@@ -371,6 +373,7 @@ function shipmentPrintData_(params, ctx) {
         rackId: l.rackId,
         qty: l.qty,
         batchNumber: l.batchNumber,
+        ed: l.ed || '',
         sjNo: l.sjNo
       };
     }),

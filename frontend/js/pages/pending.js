@@ -113,7 +113,9 @@ function buildQueueTable(items, reload) {
       customerId: r.customerId,
       alasan: r.alasan,
       eta: r.eta,
-      pic: r.pic
+      pic: r.pic,
+      plannedBatch: r.plannedBatch,
+      plannedEd: r.plannedEd
     };
 
     const actions = el('div', { class: 'btn-group' }, [
@@ -177,7 +179,9 @@ function buildOpenTable(items, reload) {
       customerId: r.customerId,
       alasan: '',
       eta: '',
-      pic: ''
+      pic: '',
+      plannedBatch: r.plannedBatch,
+      plannedEd: r.plannedEd
     };
 
     const actions = el('div', { class: 'btn-group' }, [

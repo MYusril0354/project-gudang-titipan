@@ -82,6 +82,7 @@ export function buildDocument(data) {
       p.code || '—',
       p.name || '—',
       l.batchNumber || '—',
+      l.ed ? fmtDate(l.ed) : '—',
       l.sjNo || '—',
       r.code || '—',
       `${fmt(l.qty)} ${p.unit || ''}`.trim()
@@ -186,12 +187,12 @@ const PRINT_TEMPLATE = `
     <thead>
       <tr>
         <th>#</th><th>Kode</th><th>Produk</th><th>No. Batch</th>
-        <th>SJ Asal</th><th>Rak</th><th>Qty</th>
+        <th>ED</th><th>SJ Asal</th><th>Rak</th><th>Qty</th>
       </tr>
     </thead>
     <tbody id="docRows"></tbody>
     <tfoot>
-      <tr><td colspan="6">Total</td><td id="totalQty"></td></tr>
+      <tr><td colspan="7">Total</td><td id="totalQty"></td></tr>
     </tfoot>
   </table>
 
