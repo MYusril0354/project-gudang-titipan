@@ -38,22 +38,23 @@ export async function openCreateShipment(onDone) {
   const draft = {
     date: state.serverDate || '',
     customerId: state.master.customers[0].id,
-    driver: '',
-    vehicle: '',
+    ekspedisi: '',
     note: '',
     lines: []
   };
 
   let batches = [];
   let loadingBatches = true;
+  /** Penjaga agar pemilihan pelanggan otomatis hanya dicoba sekali. */
+  let autoPicked = false;
 
   const dateInput = el('input', { type: 'date', value: draft.date, required: true });
   const customerSelect = select(
     state.master.customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` })),
     draft.customerId
   );
-  const driverInput = el('input', { type: 'text', placeholder: 'Nama sopir' });
-  const vehicleInput = el('input', { type: 'text', placeholder: 'Nomor kendaraan' });
+  // Satu kolom "Ekspedisi" menggantikan Sopir + Kendaraan (muncul di cetak).
+  const ekspedisiInput = el('input', { type: 'text', placeholder: 'Nama ekspedisi / pengangkutan' });
   const noteInput = el('input', { type: 'text', placeholder: 'Catatan (opsional)' });
   const linesWrap = el('div');
   const summary = el('div', { class: 'hint' });
@@ -69,16 +70,14 @@ export async function openCreateShipment(onDone) {
         field('Tanggal kirim', dateInput, null, true),
         field('Pelanggan', customerSelect, null, true)
       ]),
-      grid2([
-        field('Sopir', driverInput, null, false),
-        field('Kendaraan', vehicleInput, null, false)
-      ]),
+      field('Ekspedisi', ekspedisiInput,
+        'Tercetak pada surat jalan. Boleh dikosongkan.', false),
       field('Catatan', noteInput, null, false),
       el('div', { class: 'addline-box' }, [
         el('div', { class: 'addline-title', text: 'Baris Pengiriman' }),
         linesWrap,
         el('div', { class: 'row-between' }, [
-          btn('+ Tambah Baris', { onClick: () => { draft.lines.push({ receiptId: '', qty: 1 }); renderLines(); } }),
+          btn('+ Tambah Baris', { onClick: () => { draft.lines.push({ receiptId: '', qty: 1, colly: 0 }); renderLines(); } }),
           summary
         ])
       ])
@@ -105,6 +104,13 @@ export async function openCreateShipment(onDone) {
     }
     loadingBatches = false;
 
+    // Pelanggan terpilih belum punya stok: coba pilih pelanggan lain yang punya,
+    // supaya form tidak langsung tampak kosong. Hanya dicoba sekali.
+    if (!batches.length && !autoPicked) {
+      const moved = await pickCustomerWithStock();
+      if (moved) return;
+    }
+
     if (!batches.length) {
       draft.lines = [];
       linesWrap.innerHTML = '';
@@ -119,16 +125,42 @@ export async function openCreateShipment(onDone) {
     }
     submitBtn.disabled = false;
     savePrintBtn.disabled = false;
-    draft.lines = [{ receiptId: batches[0].id, qty: 1 }];
+    draft.lines = [{ receiptId: batches[0].id, qty: 1, colly: 0 }];
     renderLines();
   }
 
-  /** Render baris: batch + qty + sisa. */
+  /**
+   * Pilih otomatis pelanggan pertama yang masih punya stok.
+   * Memakai `stock.list()` (satu panggilan) yang sudah memuat ringkasan per
+   * pelanggan, bukan menanyakan satu per satu.
+   * @returns {Promise<boolean>} true bila pelanggan diganti (pemanggil berhenti)
+   */
+  async function pickCustomerWithStock() {
+    autoPicked = true;
+    try {
+      const res = await stock.list({});
+      const withStock = (res.perCustomer || []).filter((c) => c.qty > 0);
+      if (!withStock.length) return false;
+
+      const current = String(customerSelect.value);
+      const target = withStock.find((c) => String(c.customerId) === current) || withStock[0];
+      if (!target || String(target.customerId) === current) return false;
+
+      customerSelect.value = target.customerId;
+      draft.customerId = target.customerId;
+      await loadBatches();
+      return true;
+    } catch (ignore) {
+      return false;
+    }
+  }
+
+  /** Render baris: batch + qty + colly (koli) + sisa. */
   function renderLines() {
     linesWrap.innerHTML = '';
 
     if (!draft.lines.length) {
-      draft.lines.push({ receiptId: batches.length ? batches[0].id : '', qty: 1 });
+      draft.lines.push({ receiptId: batches.length ? batches[0].id : '', qty: 1, colly: 0 });
     }
 
     draft.lines.forEach((ln, i) => {
@@ -155,6 +187,16 @@ export async function openCreateShipment(onDone) {
         updateSummary();
       });
 
+      // Colly (jumlah koli) — tercetak di surat jalan, totalnya di baris bawah.
+      const collyInput = el('input', {
+        class: 'inline-input', type: 'number', min: '0', step: '1',
+        value: String(ln.colly || 0), style: { width: '90px' }
+      });
+      collyInput.addEventListener('input', () => {
+        draft.lines[i].colly = Number(collyInput.value || 0);
+        updateSummary();
+      });
+
       const batch = batches.find((b) => b.id === ln.receiptId) || {};
       const removeBtn = btn('×', {
         variant: 'danger', sm: true, disabled: draft.lines.length === 1,
@@ -164,9 +206,12 @@ export async function openCreateShipment(onDone) {
       linesWrap.appendChild(el('div', { class: 'ship-line' }, [
         el('div', { class: 'ship-line-main' }, [batchSelect]),
         el('div', { class: 'ship-line-side' }, [
+          el('span', { class: 'sub', text: 'qty' }),
           qtyInput,
           el('span', { class: 'sub', text: batch.unit || '' }),
           el('span', { class: 'sub', text: `maks ${fmt(Math.max(0, max))}` }),
+          el('span', { class: 'sub', text: 'colly' }),
+          collyInput,
           removeBtn
         ])
       ]));
@@ -177,11 +222,13 @@ export async function openCreateShipment(onDone) {
 
   function updateSummary() {
     const total = draft.lines.reduce((a, l) => a + Number(l.qty || 0), 0);
+    const totalColly = draft.lines.reduce((a, l) => a + Number(l.colly || 0), 0);
     const over = draft.lines.some((l, i) => {
       const max = remainingFor(batches, draft.lines, l.receiptId, i);
       return Number(l.qty || 0) > max;
     });
-    summary.textContent = `${draft.lines.length} baris · total ${fmt(total)} unit` + (over ? ' · ada qty melebihi sisa batch' : '');
+    summary.textContent = `${draft.lines.length} baris · total ${fmt(total)} unit · ${fmt(totalColly)} colly`
+      + (over ? ' · ada qty melebihi sisa batch' : '');
     summary.style.color = over ? 'var(--red)' : '';
   }
 
@@ -221,12 +268,17 @@ export async function openCreateShipment(onDone) {
       const res = await shipment.create({
         date: dateInput.value,
         customerId: customerSelect.value,
-        driver: driverInput.value.trim(),
-        vehicle: vehicleInput.value.trim(),
+        ekspedisi: ekspedisiInput.value.trim(),
         note: noteInput.value.trim(),
         lines: draft.lines.map((l) => {
           const b = batches.find((x) => x.id === l.receiptId) || {};
-          return { productId: b.productId, receiptId: l.receiptId, rackId: b.rackId, qty: Number(l.qty) };
+          return {
+            productId: b.productId,
+            receiptId: l.receiptId,
+            rackId: b.rackId,
+            qty: Number(l.qty),
+            colly: Number(l.colly || 0)
+          };
         })
       });
       dlg.close();

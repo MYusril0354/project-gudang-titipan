@@ -135,16 +135,22 @@ Balasan: `{ customerId, items[], totals:{batches,qty} }` — hanya batch bersisa
 ```json
 { "action": "shipment.create", "params": {
   "date": "2026-11-12", "customerId": "<id>",
-  "driver": "Budi", "vehicle": "B 1234 XY", "note": "",
-  "lines": [ { "productId": "<id>", "receiptId": "<id batch>", "rackId": "<id rak>", "qty": 30 } ] } }
+  "ekspedisi": "EKSPEDISI CEPAT", "note": "",
+  "lines": [ { "productId": "<id>", "receiptId": "<id batch>", "rackId": "<id rak>",
+               "qty": 30, "colly": 3 } ] } }
 ```
+
+- `ekspedisi` menggantikan `driver` + `vehicle` pada dokumen cetak (kedua field
+  lama masih diterima demi kompatibilitas, tetapi tidak dipakai lagi).
+- `colly` = jumlah koli per baris; opsional, kosong dianggap `0`, maksimal
+  100.000. Tercetak sebagai kolom **Colly** dengan **total Colly** di baris Total.
 
 Nomor `DO-TTR-{urut 3}` diambil dari counter terpisah. Status langsung `SHIPPED`
 (langsung memotong stok). Validasi stok **diulang di server di dalam lock** dan
 mengakumulasi baris yang memakai batch sama.
 
 Error: `INSUFFICIENT_STOCK` (qty > sisa), `VALIDATION_ERROR` (batch bukan milik
-pelanggan / produk tidak cocok), `NOT_FOUND` (batch hilang).
+pelanggan / produk tidak cocok / colly tidak wajar), `NOT_FOUND` (batch hilang).
 
 ### `shipment.markDelivered`
 
@@ -162,9 +168,15 @@ Pengiriman `VOID` ditolak; yang sudah `DELIVERED` dikembalikan apa adanya.
 ```
 
 Menaikkan `print_count` + menyimpan `last_printed_at`. Balasan berisi
-`no, date, customerId, customer{name,address,phone}, driver, vehicle, note,
-status, podDate, printCount, lines[{productId,rackId,qty,batchNumber,sjNo}],
+`no, date, customerId, customer{name,address,phone}, ekspedisi, note,
+status, podDate, printCount, totalQty, totalColly,
+lines[{productId,productCode,productName,unit,rackId,qty,colly,batchNumber,ed,sjNo}],
 company{}` — dipakai `frontend/js/print.js`. Pengiriman `VOID` ditolak.
+
+**Susunan dokumen cetak (surat jalan):** kolom
+`#, Kode, Produk, No. Batch, ED, SJ Asal, Qty, Colly` — kolom **Rak dihilangkan**,
+dan blok kanan atas berlabel **Ekspedisi** (bukan Pengangkutan/Sopir/Kendaraan).
+Baris Total memuat **total Qty** dan **total Colly**.
 
 ### `shipment.void`
 

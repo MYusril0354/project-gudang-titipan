@@ -117,7 +117,6 @@ pada SJ tidak ada / SJ selesai / rak salah / PIC kosong) dan E2E hanya-baca
 sengaja **tidak** dijalankan otomatis agar tidak mengubah data pengguna.
 
 ### Satuan produk bebas
-
 Atas permintaan pengguna, **satuan produk tidak lagi dibatasi daftar tetap**.
 Ini **menyimpang dari PRD 6.8** (`pcs, rim, pak, box, lusin, unit, kg, liter`)
 secara sengaja.
@@ -134,6 +133,30 @@ secara sengaja.
 - Impor CSV: catatan kolom satuan diperbarui.
 - Uji: self-test kini memeriksa "satuan bebas diterima" dan "satuan > 20
   karakter ditolak" (20/20 lolos).
+
+### Penyesuaian dokumen cetak + Colly
+
+Permintaan pengguna saat masuk tahap pengiriman:
+
+- kolom **Rak dihilangkan** dari surat jalan;
+- blok kanan atas berlabel **Ekspedisi** (sebelumnya "Pengangkutan") dan hanya
+  memuat satu nilai **Ekspedisi** — Sopir & Kendaraan dihapus dari form, skema,
+  dan cetakan (kolom lamanya dibiarkan ada agar data lama tetap terbaca);
+- tanda tangan kedua menjadi **"Ekspedisi / Pengirim"**;
+- kolom **Colly** ditambahkan per baris, dan **total Colly** menjadi angka di
+  baris Total dokumen (di samping total Qty).
+
+Skema versi 3: `shipments.ekspedisi`, `shipment_lines.colly` (keduanya di akhir
+header, dijalankan lewat `system.migrate`). Form pengiriman juga otomatis
+memilih pelanggan pertama yang **masih punya stok**, supaya tidak langsung
+tampak "tidak ada batch tersedia".
+
+**Bug harness self-test yang ditemukan & diperbaiki:** uji "hapus saat belum
+dipakai" memakai `created.pop()` yang membuang entri **terakhir**, bukan entri
+yang dihapus — akibatnya produk uji `TEST-P2` tertinggal di sheet milik
+pengguna. Diganti `forget(id)` yang membuang berdasarkan id, dan sisa `TEST-P2`
+dibersihkan (hanya baris uji itu; data pengguna tidak disentuh). self-test
+kembali 20/20 dengan `cleanup.failed` kosong.
 
 ## Fase 4 — Selesai
 

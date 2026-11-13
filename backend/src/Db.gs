@@ -11,7 +11,7 @@
 var PROP_SPREADSHEET_ID = 'SPREADSHEET_ID';
 
 /** Versi skema data — naikkan saat HEADERS_ berubah (dipakai system.migrate). */
-var SCHEMA_VERSION_ = '2';
+var SCHEMA_VERSION_ = '3';
 
 /** Nama sheet sesuai model data (PRD bagian 10). */
 var TABLES_ = [
@@ -36,8 +36,9 @@ var HEADERS_ = {
   // `ed` = tanggal kedaluwarsa batch yang BENAR-BENAR diterima (diisi saat Fisik Ada).
   receipts: ['id', 'sj_line_id', 'qty', 'rack_id', 'date', 'pic', 'batch_number', 'kondisi', 'created_at', 'created_by', 'updated_at', 'updated_by', 'ed'],
   cancellations: ['id', 'sj_line_id', 'qty', 'reason', 'note', 'date', 'created_at', 'created_by', 'updated_at', 'updated_by'],
-  shipments: ['no', 'date', 'customer_id', 'status', 'pod_date', 'driver', 'vehicle', 'note', 'print_count', 'last_printed_at', 'created_at', 'created_by', 'updated_at', 'updated_by'],
-  shipment_lines: ['id', 'shipment_no', 'product_id', 'rack_id', 'qty', 'created_at', 'created_by', 'updated_at', 'updated_by'],
+  shipments: ['no', 'date', 'customer_id', 'status', 'pod_date', 'driver', 'vehicle', 'note', 'print_count', 'last_printed_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'ekspedisi'],
+  // `colly` = jumlah koli/colly per baris (dipakai di cetak surat jalan).
+  shipment_lines: ['id', 'shipment_no', 'product_id', 'rack_id', 'qty', 'created_at', 'created_by', 'updated_at', 'updated_by', 'colly'],
   shipment_consumptions: ['id', 'shipment_line_id', 'receipt_id', 'sj_no', 'batch_number', 'qty', 'created_at'],
   movements: ['id', 'date', 'type', 'ref', 'product_id', 'customer_id', 'rack_id', 'qty', 'batch_number', 'sj_ref', 'note', 'created_at'],
   counters: ['key', 'value'],

@@ -17,8 +17,8 @@ Kolom `id` diisi server. Semua tabel punya `created_at`, `created_by`, `updated_
 | `sj_lines` | id, sj_no, product_id, qty_sj, qty_cancelled, decision (OPEN/WAITING/DONE), alasan, eta, pic, **planned_batch**, **planned_ed** |
 | `receipts` | id, sj_line_id, qty, rack_id, date, pic, batch_number, kondisi, **ed** |
 | `cancellations` | id, sj_line_id, qty, reason, note, date |
-| `shipments` | no (unik), date, customer_id, status, pod_date, driver, vehicle, note, print_count, last_printed_at |
-| `shipment_lines` | id, shipment_no, product_id, rack_id, qty |
+| `shipments` | no (unik), date, customer_id, status, pod_date, driver, vehicle, note, print_count, last_printed_at, **ekspedisi** |
+| `shipment_lines` | id, shipment_no, product_id, rack_id, qty, **colly** |
 | `shipment_consumptions` | id, shipment_line_id, receipt_id, sj_no, batch_number, qty |
 | `movements` | id, date, type (CONSIGN_IN/CONSIGN_OUT/VOID_OUT), ref, product_id, customer_id, rack_id, qty (+/−), batch_number, sj_ref, note |
 | `counters` | key (mis. `SJ-2026`, `DO-TTR`, `BATCH-20261111`), value |
@@ -43,6 +43,8 @@ Header lengkap tiap tabel ada di `backend/src/Db.gs` (`HEADERS_`).
 7. **Kolom baru selalu ditambahkan di AKHIR** daftar `HEADERS_` supaya posisi kolom (dan seluruh data lama) tidak bergeser. Setelah menambah kolom, jalankan `system.migrate` (ADMIN) untuk menuliskan header yang belum ada; header yang sudah berisi nama lain **tidak** ditimpa, hanya dilaporkan sebagai konflik.
 8. **Satuan produk bebas diisi** (teks, maksimal 20 karakter) — menyimpang dari PRD 6.8 yang membatasi daftar tetap `pcs, rim, pak, box, lusin, unit, kg, liter`, atas permintaan pengguna. Daftar `SATUAN_UMUM_` tetap disediakan sebagai **saran** di UI (datalist), bukan aturan. Validasi yang tersisa hanya kewajaran: wajib diisi, maks 20 karakter, tanpa karakter kontrol.
 9. **No. Batch TIDAK unik** — menyimpang dari PRD temuan #10, atas permintaan pengguna. Di lapangan nomor batch pabrik/supplier muncul di beberapa Surat Jalan sekaligus, bahkan beberapa baris dalam satu SJ. Ini aman karena **satu batch = satu baris `receipts`**, dan seluruh perhitungan stok, pengiriman, kartu stock, serta void memakai `receipts.id`, bukan `batch_number`. Nomor batch murni label penelusuran, jadi dua penerimaan dengan nomor sama tetap dua batch terpisah yang saldonya tidak saling bercampur.
+10. **`ekspedisi` menggantikan `driver` + `vehicle`** di dokumen cetak (permintaan pengguna). Kolom `driver`/`vehicle` sengaja **tidak dihapus** dari skema agar data lama tetap terbaca; keduanya tidak lagi diisi maupun ditampilkan.
+11. **`colly`** = jumlah koli per baris pengiriman, diisi manual saat membuat pengiriman, tercetak sebagai kolom **Colly**, dan **total Colly** menjadi angka di baris Total dokumen cetak (di samping total Qty).
 
 ## Perhitungan Kunci (PRD 6.1)
 

@@ -48,6 +48,17 @@ function systemSelfTest_(params, ctx) {
 
   var created = [];   // { entity, id } untuk dibersihkan
   function track(entity, row) { created.push({ entity: entity, id: row.id }); return row; }
+  /**
+   * Buang satu id dari daftar pembersihan.
+   * JANGAN memakai `created.pop()`: kalau ada record lain yang dibuat setelahnya,
+   * pop() membuang record yang salah sehingga record lain tertinggal di sheet.
+   */
+  function forget(id) {
+    for (var i = created.length - 1; i >= 0; i--) {
+      if (String(created[i].id) === String(id)) { created.splice(i, 1); return true; }
+    }
+    return false;
+  }
 
   var admin = { username: 'selfTest', role: ROLES.ADMIN, userId: 'selfTest' };
 
@@ -72,8 +83,9 @@ function systemSelfTest_(params, ctx) {
       return masterUpdate_({ entity: 'product', id: prod.id, values: { name: 'Uji Revisi' } }, admin);
     });
     check('product: hapus saat belum dipakai', true, function () {
-      created.pop();
-      return masterDelete_({ entity: 'product', id: prod.id }, admin);
+      var res = masterDelete_({ entity: 'product', id: prod.id }, admin);
+      forget(prod.id);
+      return res;
     });
   }
 

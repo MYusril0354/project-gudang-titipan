@@ -12,7 +12,7 @@
  */
 
 import { shipment } from './api.js';
-import { state, fmt, fmtDate, findProduct, findCustomer, findRack } from './state.js';
+import { state, fmt, fmtDate, findProduct, findCustomer } from './state.js';
 
 /**
  * Cetak Surat Jalan untuk satu nomor pengiriman.
@@ -53,10 +53,10 @@ export function buildDocument(data) {
   const customer = data.customer || findCustomer(data.customerId);
   const rows = (data.lines || []).map((l, i) => {
     const p = findProduct(l.productId);
-    const r = findRack(l.rackId);
-    return { i: i + 1, p, r, l };
+    return { i: i + 1, p, l };
   });
   const totalQty = (data.lines || []).reduce((a, l) => a + Number(l.qty || 0), 0);
+  const totalColly = (data.lines || []).reduce((a, l) => a + Number(l.colly || 0), 0);
 
   // Bangun DOM lewat API aman, bukan string interpolation.
   const doc = document.implementation.createHTMLDocument('Surat Jalan ' + no_(data));
@@ -71,12 +71,13 @@ export function buildDocument(data) {
   setText(doc, '#custName', customer.name);
   setText(doc, '#custAddr', customer.address);
   setText(doc, '#custPhone', customer.phone);
-  setText(doc, '#driver', data.driver || '—');
-  setText(doc, '#vehicle', data.vehicle || '—');
+  // Satu baris "Ekspedisi" menggantikan Sopir + Kendaraan.
+  setText(doc, '#ekspedisi', data.ekspedisi || '—');
 
   const tbody = doc.querySelector('#docRows');
-  rows.forEach(({ i, p, r, l }) => {
+  rows.forEach(({ i, p, l }) => {
     const tr = doc.createElement('tr');
+    // Kolom Rak dihilangkan; Colly ditambahkan.
     [
       String(i),
       p.code || '—',
@@ -84,8 +85,8 @@ export function buildDocument(data) {
       l.batchNumber || '—',
       l.ed ? fmtDate(l.ed) : '—',
       l.sjNo || '—',
-      r.code || '—',
-      `${fmt(l.qty)} ${p.unit || ''}`.trim()
+      `${fmt(l.qty)} ${p.unit || ''}`.trim(),
+      l.colly ? fmt(l.colly) : '—'
     ].forEach((text) => {
       const td = doc.createElement('td');
       td.textContent = text;
@@ -95,6 +96,7 @@ export function buildDocument(data) {
   });
 
   setText(doc, '#totalQty', fmt(totalQty));
+  setText(doc, '#totalColly', fmt(totalColly));
   setText(doc, '#docNote', data.note || '');
 
   return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
@@ -177,9 +179,8 @@ const PRINT_TEMPLATE = `
       <div class="meta-line" id="custPhone"></div>
     </div>
     <div>
-      <div class="meta-label">Pengangkutan</div>
-      <div class="meta-line">Sopir: <b id="driver"></b></div>
-      <div class="meta-line">Kendaraan: <b id="vehicle"></b></div>
+      <div class="meta-label">Ekspedisi</div>
+      <div class="meta-line"><b id="ekspedisi"></b></div>
     </div>
   </section>
 
@@ -187,12 +188,16 @@ const PRINT_TEMPLATE = `
     <thead>
       <tr>
         <th>#</th><th>Kode</th><th>Produk</th><th>No. Batch</th>
-        <th>ED</th><th>SJ Asal</th><th>Rak</th><th>Qty</th>
+        <th>ED</th><th>SJ Asal</th><th>Qty</th><th>Colly</th>
       </tr>
     </thead>
     <tbody id="docRows"></tbody>
     <tfoot>
-      <tr><td colspan="7">Total</td><td id="totalQty"></td></tr>
+      <tr>
+        <td colspan="6">Total</td>
+        <td id="totalQty"></td>
+        <td id="totalColly"></td>
+      </tr>
     </tfoot>
   </table>
 
@@ -200,7 +205,7 @@ const PRINT_TEMPLATE = `
 
   <section class="signs">
     <div><div class="sign-line"></div><div class="sign-cap">Disiapkan Gudang</div></div>
-    <div><div class="sign-line"></div><div class="sign-cap">Sopir / Pengirim</div></div>
+    <div><div class="sign-line"></div><div class="sign-cap">Ekspedisi / Pengirim</div></div>
     <div><div class="sign-line"></div><div class="sign-cap">Diterima Pelanggan</div></div>
   </section>
 </div>

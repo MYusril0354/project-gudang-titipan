@@ -36,6 +36,7 @@ function shipmentLineView_(line, ds) {
     rackId: line.rack_id,
     rackCode: rack.code || '',
     qty: Number(line.qty || 0),
+    colly: Number(line.colly || 0),
     receiptId: first.receipt_id || '',
     batchNumber: first.batch_number || '',
     ed: receipt.ed || '',
@@ -56,6 +57,8 @@ function shipmentView_(sh, ds) {
     customerName: customer.name || '(pelanggan terhapus)',
     status: sh.status || 'SHIPPED',
     podDate: sh.pod_date || '',
+    // `ekspedisi` menggantikan sopir + kendaraan di dokumen cetak.
+    ekspedisi: sh.ekspedisi || '',
     driver: sh.driver || '',
     vehicle: sh.vehicle || '',
     note: sh.note || '',
@@ -63,6 +66,7 @@ function shipmentView_(sh, ds) {
     lastPrintedAt: sh.last_printed_at || '',
     totalLines: lines.length,
     totalQty: lines.reduce(function (a, l) { return a + l.qty; }, 0),
+    totalColly: lines.reduce(function (a, l) { return a + l.colly; }, 0),
     lines: lines
   };
 }
@@ -75,8 +79,24 @@ function shipmentDataset_() {
   return stockDataset_();
 }
 
-/** Ambil pengiriman berdasarkan nomor atau lempar NOT_FOUND. */
-function findShipment_(no) {
+/**
+ * Baca nilai colly dari input baris. Kosong/undefined -> 0.
+ * Batas 100.000 supaya salah ketik tidak merusak total di dokumen cetak.
+ */
+var COLLY_MAX_ = 100000;
+
+function parseColly_(value, lineIndex) {
+  if (value === undefined || value === null || String(value).trim() === '') return 0;
+  var n = assertPositiveInt_(value, 'lines[' + lineIndex + '].colly', 0);
+  if (n > COLLY_MAX_) {
+    throw apiError_('VALIDATION_ERROR',
+      'Colly baris ' + (lineIndex + 1) + ' terlalu besar (maks ' + COLLY_MAX_ + ').',
+      'lines[' + lineIndex + '].colly');
+  }
+  return n;
+}
+
+/** Ambil pengiriman berdasarkan nomor atau lempar NOT_FOUND. */function findShipment_(no) {
   var found = readTableWhere_('shipments', { no: no });
   if (!found.length) throw apiError_('NOT_FOUND', 'Pengiriman tidak ditemukan.', 'no');
   return found[0];
@@ -201,6 +221,8 @@ function shipmentCreate_(params, ctx) {
       receiptId: receiptId,
       rackId: String(ln.rackId || receipt.rack_id || ''),
       qty: qty,
+      // Colly (jumlah koli) opsional; kosong dianggap 0.
+      colly: parseColly_(ln.colly, i),
       batchNumber: view.batchNumber,
       sjNo: view.sjNo,
       available: view.available,
@@ -233,6 +255,7 @@ function shipmentCreate_(params, ctx) {
     pod_date: '',
     driver: String(params.driver || '').trim(),
     vehicle: String(params.vehicle || '').trim(),
+    ekspedisi: String(params.ekspedisi || '').trim(),
     note: String(params.note || '').trim(),
     print_count: 0,
     last_printed_at: '',
@@ -249,6 +272,7 @@ function shipmentCreate_(params, ctx) {
       product_id: p.productId,
       rack_id: p.rackId,
       qty: p.qty,
+      colly: p.colly,
       created_at: now,
       created_by: ctx.username,
       updated_at: now,
@@ -256,7 +280,6 @@ function shipmentCreate_(params, ctx) {
     };
   });
   appendRows_('shipment_lines', lineRows);
-
   // Satu baris mengonsumsi satu batch; jejak batch + SJ asal disimpan.
   appendRows_('shipment_consumptions', prepared.map(function (p, idx) {
     return {
@@ -363,15 +386,22 @@ function shipmentPrintData_(params, ctx) {
     },
     driver: view.driver,
     vehicle: view.vehicle,
+    ekspedisi: view.ekspedisi,
     note: view.note,
     status: view.status,
     podDate: view.podDate,
     printCount: view.printCount + 1,
+    totalQty: view.totalQty,
+    totalColly: view.totalColly,
     lines: view.lines.map(function (l) {
       return {
         productId: l.productId,
+        productCode: l.productCode,
+        productName: l.productName,
+        unit: l.unit,
         rackId: l.rackId,
         qty: l.qty,
+        colly: l.colly,
         batchNumber: l.batchNumber,
         ed: l.ed || '',
         sjNo: l.sjNo

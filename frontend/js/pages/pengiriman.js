@@ -128,9 +128,9 @@ function buildCard(item, opts) {
     el('span', {}, [document.createTextNode('Pelanggan '), el('b', { text: item.customerName })]),
     el('span', {}, [document.createTextNode('Total '), el('b', { text: `${fmt(item.totalQty)} unit` })])
   ];
-  if (item.driver) headMeta.push(el('span', {}, [document.createTextNode('Sopir '), el('b', { text: item.driver })]));
-  if (item.vehicle) headMeta.push(el('span', {}, [document.createTextNode('Kendaraan '), el('b', { text: item.vehicle })]));
+  if (item.ekspedisi) headMeta.push(el('span', {}, [document.createTextNode('Ekspedisi '), el('b', { text: item.ekspedisi })]));
   if (item.podDate) headMeta.push(el('span', {}, [document.createTextNode('POD '), el('b', { text: fmtDate(item.podDate) })]));
+  if (item.totalColly) headMeta.push(el('span', {}, [document.createTextNode('Colly '), el('b', { text: fmt(item.totalColly) })]));
   if (item.printCount > 0) {
     headMeta.push(el('span', {}, [
       document.createTextNode('Dicetak '),
@@ -155,9 +155,11 @@ function buildCard(item, opts) {
         el('th', { class: 'num', text: '#' }),
         el('th', { text: 'Produk / Kode' }),
         el('th', { text: 'No. Batch' }),
+        el('th', { text: 'ED' }),
         el('th', { text: 'SJ Asal' }),
         el('th', { text: 'Rak' }),
-        el('th', { class: 'num', text: 'Qty' })
+        el('th', { class: 'num', text: 'Qty' }),
+        el('th', { class: 'num', text: 'Colly' })
       ])
     ]),
     el('tbody', {}, item.lines.map((l, i) => el('tr', {}, [
@@ -167,6 +169,7 @@ function buildCard(item, opts) {
         el('div', { class: 'sub' }, [kodeTag(l.productCode)])
       ]),
       el('td', { 'data-label': 'No. Batch' }, [batchTag(l.batchNumber)]),
+      el('td', { 'data-label': 'ED', text: l.ed ? fmtDate(l.ed) : '—' }),
       el('td', { 'data-label': 'SJ Asal' }, [
         el('span', { class: 'mono', text: l.sjNo || '—' })
       ]),
@@ -174,7 +177,8 @@ function buildCard(item, opts) {
       el('td', { class: 'num', 'data-label': 'Qty' }, [
         el('b', { text: fmt(l.qty) }),
         document.createTextNode(` ${l.unit}`)
-      ])
+      ]),
+      el('td', { class: 'num', 'data-label': 'Colly', text: l.colly ? fmt(l.colly) : '—' })
     ])))
   ]);
 
