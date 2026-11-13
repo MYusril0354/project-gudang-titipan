@@ -22,6 +22,7 @@ import { renderKartuPage } from './pages/kartu.js';
 import { renderLaporanPage } from './pages/laporan.js';
 import { renderPenggunaPage } from './pages/pengguna.js';
 import { renderAuditPage } from './pages/audit.js';
+import { setCacheScope, clearEverything } from './cache.js';
 import { el } from './ui.js';
 
 /* =========================================================
@@ -74,6 +75,7 @@ async function boot() {
   }
 
   initNavToggle();
+  initSyncIndicator();
   renderNav();
 
   // Label lingkungan — membantu memastikan tidak salah arah ke PROD/DEV.
@@ -82,6 +84,8 @@ async function boot() {
   try {
     const data = await system.bootstrap();
     applyBootstrap(data);
+    // Cache dipisah per pengguna supaya data tidak bocor antar akun.
+    setCacheScope(data.user && data.user.userId);
     renderUser();
     renderToday();
     renderNav(); // filter ulang setelah peran diketahui
@@ -107,8 +111,41 @@ function renderUser() {
     btn.disabled = true;
     try { await auth.logout(); } catch (ignore) { /* tetap keluar secara lokal */ }
     clearSession();
+    clearEverything(); // jangan tinggalkan salinan data di browser
     location.href = 'login.html';
   });
+}
+
+/**
+ * Indikator "Memperbarui…" + render ulang otomatis saat data segar tiba.
+ *
+ * Data lama tampil seketika dari cache, lalu disegarkan di belakang. Bila
+ * isinya berubah, halaman dirender ulang — kecuali sedang ada modal terbuka
+ * atau pengguna sedang mengetik, agar fokus tidak hilang.
+ */
+function initSyncIndicator() {
+  const pill = document.getElementById('syncPill');
+
+  window.addEventListener('app:sync', (e) => {
+    const pending = (e.detail && e.detail.pending) || 0;
+    if (pill) pill.hidden = pending <= 0;
+  });
+
+  window.addEventListener('app:data-fresh', () => {
+    if (isBusy()) return;
+    renderRoute(state.route);
+  });
+}
+
+/** Apakah pengguna sedang berinteraksi (modal terbuka / mengetik). */
+function isBusy() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (modalRoot && modalRoot.children.length > 0) return true;
+
+  const a = document.activeElement;
+  if (!a) return false;
+  const tag = a.tagName;
+  return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
 }
 
 function renderToday() {

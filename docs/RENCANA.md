@@ -31,16 +31,22 @@ Dokumen operasional: [RUNBOOK](RUNBOOK.md) · checklist [UAT](UAT.md).
 
 ### Temuan kinerja (jujur)
 
-Target PRD 0,5–2 dtk **belum tercapai** untuk endpoint multi-tabel: `system.health`
-yang tidak menyentuh sheet pun sudah ~1,7 dtk (batas platform), dan tiap
-`getValues()` menambah satu round-trip.
+Batas bawah platform: `curl` ke `/exec` menunjukkan **1,06–1,38 dtk** hanya untuk
+menerima HTTP 302 — sebelum kode kita jalan. `system.health` (tanpa akses sheet)
+= ~1,7 dtk. Jadi **300 ms tidak mungkin** selama API ada di Apps Script.
 
-- **Berhasil:** cache per-eksekusi (objek spreadsheet, sheet, baris tabel) →
-  bootstrap −17%, dashboard −27%; `movements` dibaca hanya oleh endpoint yang perlu
-- **Gagal & dicabut:** prefetch semua tabel via `values:batchGet` + `UrlFetchApp`
-  ternyata tidak lebih cepat (bootstrap 3,5 → 4,0 dtk). Alasan didokumentasikan di `Db.gs`
-- **Jalan keluar bila target wajib dipenuhi:** pindahkan datastore dari Sheets
-  (Cloud SQL / Firestore / D1) tanpa mengubah kontrak API
+| Perbaikan | Hasil |
+| --- | --- |
+| Cache per-eksekusi + cache master di `CacheService` | server 7–22% lebih cepat (stok 4,78 → 3,71 dtk) |
+| **Cache browser + stale-while-revalidate** | pindah halaman **3,2 dtk → ~1 ms** |
+| Prefetch `values:batchGet` | ❌ dicoba, tidak lebih cepat, dicabut (alasan di `Db.gs`) |
+
+Sisa waktu server tidak bisa ditekan tanpa mengubah arsitektur: 6 tabel transaksi
+harus dibaca segar, masing-masing satu round-trip `getValues()`.
+
+**Bila target 300 ms wajib:** pindahkan API keluar dari Apps Script
+(edge/serverless + Postgres/D1). Kontrak API tidak berubah — hanya `Db.gs`
+yang diganti.
 
 ### Belum dikerjakan (perlu keputusan)
 

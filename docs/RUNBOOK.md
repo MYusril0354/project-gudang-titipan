@@ -171,31 +171,63 @@ Sementara ini, pantau lewat tab Error Log.
 
 ### Kinerja (diukur 2026-11-13, uji beban kecil)
 
-| Endpoint | p50 | p95 |
+**Batas bawah platform.** `curl` ke `/exec` menunjukkan TTFB **1,06–1,38 dtk**
+hanya untuk menerima HTTP 302 — sebelum satu baris kode kita berjalan.
+`system.health` yang tidak menyentuh sheet sama sekali pun ~1,7 dtk.
+
+| Endpoint | p50 sebelum optimasi | p50 sesudah |
 | --- | --- | --- |
-| `system.health` (tanpa akses sheet) | 1,7 dtk | 2,3 dtk |
-| `system.bootstrap` | 3,7 dtk | 5,8 dtk |
-| `dashboard.summary` | 3,9 dtk | 5,5 dtk |
-| `stock.list` | 4,6 dtk | 8,5 dtk |
-| `report.reconciliation` | 4,4 dtk | 6,4 dtk |
-| 5 permintaan bersamaan | sukses 15/15 | — |
+| `system.health` (tanpa akses sheet) | 1,7 dtk | 1,7 dtk |
+| `system.bootstrap` | 3,70 dtk | 3,33 dtk |
+| `dashboard.summary` | 3,90 dtk | 3,63 dtk |
+| `stock.list` | 4,78 dtk | 3,71 dtk |
+| `report.reconciliation` | 4,44 dtk | 3,73 dtk |
+| 5 permintaan bersamaan | sukses 15/15 | sukses 15/15 |
 
-**Temuan:** target PRD 0,5–2 dtk **belum tercapai** untuk endpoint multi-tabel.
-Batas bawahnya ada di platform: `system.health` yang tidak menyentuh sheet sama
-sekali sudah ~1,7 dtk. Setiap `getValues()` menambah satu round-trip.
+**Yang berhasil (server):** cache per-eksekusi + cache master data di
+`CacheService` (produk/pelanggan/gudang/rak, 5 menit, dibuang setiap kali tabel
+master ditulis) → 7–22% lebih cepat, dan menghapus 4 round-trip dari endpoint
+terpanas.
 
-**Yang sudah dilakukan:** cache per-eksekusi (objek spreadsheet, objek sheet,
-dan baris tabel) menurunkan bootstrap ~17% dan dashboard ~27%; `movements`
-hanya dibaca oleh endpoint yang memerlukannya.
+**Yang gagal dan dicabut:** prefetch semua tabel via `values:batchGet` +
+`UrlFetchApp` ternyata **tidak lebih cepat** (bootstrap 3,5 → 4,0 dtk). Alasan
+didokumentasikan di `Db.gs` supaya tidak diulang.
 
-**Yang dicoba dan ditolak:** prefetch semua tabel lewat satu panggilan
-`values:batchGet` + `UrlFetchApp`. Hasil pengukuran **tidak lebih cepat**
-(bootstrap p50 3,5 → 4,0 dtk) — biaya token OAuth + round-trip HTTPS menyamai
-penghematan. Perubahan dicabut; alasannya didokumentasikan di `Db.gs`.
+**Sisa waktu tidak bisa ditekan tanpa mengubah arsitektur:** 6 tabel transaksi
+(`receipts`, `shipment_consumptions`, `shipments`, `shipment_lines`, `sj`,
+`sj_lines`) harus dibaca segar setiap request, masing-masing satu round-trip
+`getValues()` ~250–350 ms.
 
-**Bila target harus dipenuhi:** pindahkan datastore dari Sheets
-(Cloud SQL / Firestore / D1). Kontrak API tidak perlu berubah — hanya lapisan
-`Db.gs` yang diganti.
+### Kinerja terasa (cache di browser) — dampak terbesar
+
+Frontend menyimpan salinan respons di `localStorage` dan memakai pola
+*stale-while-revalidate*: data lama tampil **seketika**, lalu disegarkan di
+belakang dengan indikator **"Memperbarui…"**.
+
+| Skenario | Sebelum | Sesudah |
+| --- | --- | --- |
+| Kunjungan pertama sebuah halaman | ~3,2 dtk | ~3,2 dtk (tidak berubah) |
+| **Kunjungan berikutnya / pindah-pindah halaman** | ~3,2 dtk | **~0,001 dtk** |
+
+Cara kerjanya:
+
+- Cache dipisah **per pengguna**; berganti akun → cache dibuang.
+- Setiap aksi **tulis** membuang seluruh cache, lalu halaman memuat data segar.
+- Indikator "Memperbarui…" muncul selama penyegaran latar berjalan.
+- Halaman dirender ulang otomatis bila isi data berubah — **kecuali** sedang ada
+  modal terbuka atau pengguna sedang mengetik (agar fokus tidak hilang).
+- Bila jaringan gagal tetapi ada salinan lama, data lama tetap ditampilkan
+  dengan pesan yang jelas — bukan layar kosong.
+- Form yang butuh data pasti (sisa batch pada form pengiriman) memakai
+  `{ fresh: true }` sehingga **tidak** memakai cache.
+
+**Bila data terlihat tidak sesuai:** tunggu beberapa detik (penyegaran latar
+berjalan otomatis), atau buka DevTools → `localStorage.removeItem('gt_cache_v1')`
+lalu muat ulang. Verifikasi kebenaran tetap dari **Rekonsiliasi** (`variance`).
+
+**Bila target 300 ms tetap wajib:** hanya bisa dicapai dengan memindahkan API
+keluar dari Apps Script (edge/serverless + database sungguhan, mis. Postgres
+atau D1). Kontrak API tidak perlu berubah — hanya lapisan `Db.gs` yang diganti.
 
 ### Batasan lain
 
@@ -214,6 +246,8 @@ penghematan. Perubahan dicabut; alasannya didokumentasikan di `Db.gs`.
 | Gejala | Kemungkinan penyebab | Tindakan |
 | --- | --- | --- |
 | Semua halaman menampilkan "Gagal menghubungi server" | deployment belum dipindah ke versi baru, atau URL `/exec` berubah | cek `system.health`, pindahkan deployment ke versi terbaru |
+| Data terlihat tidak sesuai / tertinggal | salinan cache browser | tunggu beberapa detik (penyegaran latar otomatis), atau hapus `localStorage` kunci `gt_cache_v1` lalu muat ulang |
+| Halaman pertama kali dibuka terasa lambat | belum ada salinan cache | wajar (~3 dtk); kunjungan berikutnya instan |
 | Login gagal padahal password benar | akun terkunci setelah 5x gagal | tunggu 10 menit, atau ADMIN reset password |
 | `FORBIDDEN` pada action tertentu | `PROD_LOCK` aktif | cek `system.hardening`, buka kunci bila memang perlu |
 | `UNAUTHENTICATED` terus | token kedaluwarsa (12 jam) | login ulang; frontend otomatis mengarahkan ke halaman login |

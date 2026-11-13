@@ -39,6 +39,10 @@ body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Robot
 .hamburger svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .topbar-right{display:flex;align-items:center;gap:12px}
 .pill{background:var(--brand-soft);color:var(--brand);font-size:11.5px;font-weight:650;padding:5px 11px;border-radius:999px}
+.pill-sync{background:var(--amber-soft);color:var(--amber);display:inline-flex;align-items:center;gap:6px}
+.pill-sync::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;
+  animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 .avatar{width:34px;height:34px;border-radius:50%;background:#e2e5f5;color:#3b4270;display:grid;place-items:center;font-weight:700;font-size:12px}
 .view{padding:22px 28px 70px;display:flex;flex-direction:column;gap:18px}
 .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}

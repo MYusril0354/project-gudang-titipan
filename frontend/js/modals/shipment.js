@@ -96,7 +96,8 @@ export async function openCreateShipment(onDone) {
     linesWrap.innerHTML = '';
     linesWrap.appendChild(el('div', { class: 'hint', text: 'Memuat batch tersedia…' }));
     try {
-      const res = await stock.available(customerSelect.value);
+      // `fresh: true` — sisa batch harus data pasti, bukan salinan cache.
+      const res = await stock.available(customerSelect.value, { fresh: true });
       batches = res.items || [];
     } catch (err) {
       batches = [];

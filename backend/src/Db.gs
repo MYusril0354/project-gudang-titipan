@@ -103,6 +103,83 @@ var READ_CACHE_ = {};
 function invalidateReadCache_(table) {
   if (table) delete READ_CACHE_[table];
   else READ_CACHE_ = {};
+  if (table && isMasterTable_(table)) dropMasterCache_(table);
+}
+
+/* =========================================================
+   CACHE MASTER DATA (Fase 5+ — optimasi kinerja)
+   ---------------------------------------------------------
+   Master data (produk/pelanggan/gudang/rak) jarang berubah, tetapi dibaca
+   hampir setiap request. Menaruhnya di CacheService (berbagi antar request)
+   menghapus 2-4 round-trip getValues dari endpoint terpanas.
+
+   CacheService dibatasi 100KB per kunci, jadi tabel besar dilewati begitu saja.
+   Kunci dibuang setiap kali tabel master ditulis, sehingga tidak ada data basi
+   setelah CRUD atau impor.
+   ========================================================= */
+
+/** Tabel yang isinya jarang berubah. */
+var MASTER_TABLES_ = ['products', 'customers', 'locations', 'racks'];
+
+/** Umur cache master (detik). */
+var MASTER_CACHE_TTL_ = 300;
+
+/** Batas ukuran JSON yang boleh di-cache (byte) — sisakan ruang dari 100KB. */
+var MASTER_CACHE_MAX_ = 90000;
+
+/** Versi skema cache — naikkan bila bentuk baris berubah. */
+var MASTER_CACHE_VERSION_ = 'v1';
+
+/** Apakah tabel termasuk master data. */
+function isMasterTable_(name) {
+  return MASTER_TABLES_.indexOf(String(name)) !== -1;
+}
+
+/**
+ * Kunci cache untuk satu tabel master.
+ * Menyertakan ID spreadsheet: bila database diganti (mis. restore dari backup),
+ * cache lama tidak boleh ikut terpakai.
+ */
+function masterCacheKey_(name) {
+  var ssId = '';
+  try {
+    ssId = PropertiesService.getScriptProperties().getProperty(PROP_SPREADSHEET_ID) || '';
+  } catch (ignore) { ssId = ''; }
+  var tail = ssId.length > 12 ? ssId.slice(-12) : ssId;
+  return 'gt_m_' + tail + '_' + name + '_' + MASTER_CACHE_VERSION_;
+}
+
+/** Ambil tabel master dari CacheService; null bila tidak ada/rusak. */
+function getMasterCache_(name) {
+  try {
+    var raw = CacheService.getScriptCache().get(masterCacheKey_(name));
+    if (!raw) return null;
+    var rows = JSON.parse(raw);
+    return Object.prototype.toString.call(rows) === '[object Array]' ? rows : null;
+  } catch (ignore) {
+    return null;
+  }
+}
+
+/** Simpan tabel master ke CacheService (dilewati bila terlalu besar). */
+function putMasterCache_(name, rows) {
+  try {
+    var raw = JSON.stringify(rows);
+    if (raw.length > MASTER_CACHE_MAX_) return false;
+    CacheService.getScriptCache().put(masterCacheKey_(name), raw, MASTER_CACHE_TTL_);
+    return true;
+  } catch (ignore) {
+    return false;
+  }
+}
+
+/** Buang cache master satu tabel (dipanggil setiap kali tabel itu ditulis). */
+function dropMasterCache_(name) {
+  try {
+    CacheService.getScriptCache().remove(masterCacheKey_(name));
+  } catch (ignore) {
+    // kegagalan cache tidak boleh menggagalkan aksi utama
+  }
 }
 
 /** Workbook database aktif (di-cache per request). */
@@ -155,6 +232,15 @@ function readTable_(name) {
 
   if (READ_CACHE_[name]) return READ_CACHE_[name];
 
+  // Master data: coba cache bersama (antar request) sebelum menyentuh sheet.
+  if (isMasterTable_(name)) {
+    var cached = getMasterCache_(name);
+    if (cached) {
+      READ_CACHE_[name] = cached;
+      return cached;
+    }
+  }
+
   var sh = sheet_(name);
   var lastRow = sh.getLastRow();
   if (lastRow < 2) {
@@ -181,6 +267,7 @@ function readTable_(name) {
     }
   }
   READ_CACHE_[name] = rows;
+  if (isMasterTable_(name)) putMasterCache_(name, rows);
   return rows;
 }
 

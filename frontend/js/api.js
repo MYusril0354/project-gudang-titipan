@@ -9,8 +9,19 @@
  */
 
 import { CONFIG } from './config.js';
+import { cacheRead, cacheSet, clearAll, markRefresh } from './cache.js';
 
 const TOKEN_KEY = 'gt_token';
+
+/**
+ * Salinan cache yang lebih muda dari ini tidak perlu disegarkan lagi.
+ * Tanpa ambang ini, "render ulang karena data segar" bisa memicu muat ulang
+ * yang memicu penyegaran lagi (loop).
+ */
+const MIN_REFRESH_AGE_MS = 3000;
+
+/** Kunci yang sedang disegarkan — cegah penyegaran ganda untuk data yang sama. */
+const inFlight = new Set();
 
 /** Ambil token sesi dari sessionStorage. */
 export function getToken() {
@@ -36,13 +47,70 @@ const AUTH_ERRORS = ['UNAUTHENTICATED'];
 /**
  * Panggil satu action API.
  *
+ * Untuk aksi BACA, salinan cache dikembalikan seketika lalu disegarkan di
+ * belakang (stale-while-revalidate) sehingga pindah halaman terasa instan.
+ * Aksi TULIS selalu ke server dan membuang seluruh cache.
+ *
  * @param {string} action  mis. 'sj.create'
  * @param {object} [params]
- * @param {{write?: boolean, timeoutMs?: number}} [opts] write=true memicu requestId (idempotency key)
+ * @param {{write?: boolean, timeoutMs?: number, fresh?: boolean}} [opts]
+ *   write=true memicu requestId (idempotency key);
+ *   fresh=true memaksa ambil dari server (dipakai form yang butuh data pasti)
  * @returns {Promise<any>} isi field `data` pada envelope sukses
  * @throws {Error & {code: string, field?: string}} error terstruktur dari server
  */
 export async function api(action, params = {}, opts = {}) {
+  const cacheable = !opts.write && !opts.fresh
+    && !String(action).startsWith('auth.')
+    && action !== 'system.health';
+
+  if (cacheable) {
+    const hit = cacheRead(action, params);
+    if (hit) {
+      // Hanya segarkan bila salinan sudah cukup tua (lihat MIN_REFRESH_AGE_MS).
+      if (hit.ageMs >= MIN_REFRESH_AGE_MS) refreshInBackground(action, params, opts);
+      return hit.data;
+    }
+  }
+
+  try {
+    const data = await request(action, params, opts);
+    if (opts.write) clearAll();          // data transaksi berubah -> buang cache
+    else if (cacheable) cacheSet(action, params, data);
+    return data;
+  } catch (err) {
+    // Jaringan gagal tapi ada salinan lama -> tetap tampilkan (mode luring ringan)
+    if (cacheable && err.code === 'NETWORK') {
+      const stale = cacheRead(action, params, { ignoreTtl: true });
+      if (stale) return stale.data;
+    }
+    throw err;
+  }
+}
+
+/** Ambil data segar di belakang lalu umumkan bila isinya berubah. */
+function refreshInBackground(action, params, opts) {
+  const key = action + '|' + JSON.stringify(params || {});
+  if (inFlight.has(key)) return;
+  inFlight.add(key);
+  markRefresh(1);
+
+  request(action, params, opts)
+    .then((data) => {
+      const changed = cacheSet(action, params, data);
+      if (changed) {
+        window.dispatchEvent(new CustomEvent('app:data-fresh', { detail: { action } }));
+      }
+    })
+    .catch(() => { /* biarkan data cache yang tampil */ })
+    .finally(() => {
+      inFlight.delete(key);
+      markRefresh(-1);
+    });
+}
+
+/** Satu panggilan jaringan ke Web App. */
+async function request(action, params = {}, opts = {}) {
   const body = JSON.stringify({
     action,
     params,
@@ -134,7 +202,8 @@ export const pending = {
 
 export const stock = {
   list: (filter) => api('stock.list', filter || {}),
-  available: (customerId) => api('stock.available', { customerId })
+  // `fresh` dipakai form pengiriman: sisa batch harus pasti, bukan dari cache.
+  available: (customerId, opts) => api('stock.available', { customerId }, opts || {})
 };
 
 export const shipment = {
