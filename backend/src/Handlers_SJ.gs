@@ -327,7 +327,8 @@ function sjLineView_(line, ds) {
     eta: line.eta || '',
     pic: line.pic || '',
     /** Rencana yang diisi saat SJ dibuat — dipakai untuk mengisi form Fisik Ada. */
-    plannedBatch: line.planned_batch || '',
+    // Bisa tersimpan sebagai angka di sheet; selalu keluarkan sebagai teks.
+    plannedBatch: String(line.planned_batch || ''),
     plannedEd: line.planned_ed || '',
     status: lineStatus_(line, receipts),
     receipts: receipts.map(function (r) {
@@ -339,7 +340,7 @@ function sjLineView_(line, ds) {
         rackCode: rack.code || '',
         date: r.date,
         pic: r.pic || '',
-        batchNumber: r.batch_number || '',
+        batchNumber: String(r.batch_number || ''),
         kondisi: r.kondisi || '',
         ed: r.ed || ''
       };
@@ -564,7 +565,8 @@ function pendingRows_(ds) {
         eta: line.eta || '',
         pic: line.pic || '',
         // Rencana batch & ED dari baris SJ — dipakai mengisi form Fisik Ada.
-        plannedBatch: line.planned_batch || '',
+        // Bisa tersimpan sebagai angka di sheet; keluarkan sebagai teks.
+        plannedBatch: String(line.planned_batch || ''),
         plannedEd: line.planned_ed || '',
         umurDays: agingDays_(s.date)
       });

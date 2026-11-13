@@ -203,8 +203,8 @@ export const pending = {
 };
 
 export const stock = {
-  list: (filter) => api('stock.list', filter || {}),
-  // `fresh` dipakai form pengiriman: sisa batch harus pasti, bukan dari cache.
+  // `opts.fresh` dipakai saat memuat data pasti: form pengiriman & cetak laporan.
+  list: (filter, opts) => api('stock.list', filter || {}, opts || {}),
   available: (customerId, opts) => api('stock.available', { customerId }, opts || {})
 };
 

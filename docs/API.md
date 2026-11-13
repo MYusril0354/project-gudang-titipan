@@ -119,8 +119,15 @@ Karena itu `id` batch = `id` receipt, dan sisa batch selalu dihitung
 ```
 
 Balasan: `{ items[], perCustomer[], totals:{batches,qty,customers} }`.
-Tiap item: `{ id, batchNumber, date, qtyIn, available, kondisi, rackId, rackCode,
+Tiap item: `{ id, batchNumber, date, ed, qtyIn, available, kondisi, rackId, rackCode,
 productId, productCode, productName, unit, sjNo, customerId, customerName }`.
+
+> `batchNumber` **selalu string**, walaupun di sheet tersimpan sebagai angka
+> (mis. `2609431`) — nomor batch bisa berupa angka murni dari pabrik.
+
+Dipakai juga oleh **cetak Laporan Posisi Stok** (`frontend/js/print-stock.js`),
+yang memanggil ulang action ini dengan `{ fresh: true }` lewat klien API supaya
+angka pada dokumen tidak berasal dari salinan cache.
 
 ### `stock.available`
 

@@ -157,6 +157,31 @@ Yang tampil di kop hanya logo, judul **SURAT JALAN**, nomor, dan tanggal.
 Properti `COMPANY_*` dan `company{}` pada respons `printData` tetap ada
 (kompatibilitas), hanya tidak dirender.
 
+### Cetak Laporan Posisi Stok
+
+Halaman **Stok Titipan** dapat dicetak (`frontend/js/print-stock.js`):
+
+- mengikuti filter halaman (pencarian & pelanggan) — header laporan menyebut
+  pelanggan dan kata kunci yang aktif;
+- data diambil **ulang** dari server (`fresh: true`) tepat sebelum dicetak,
+  supaya angka pada dokumen resmi bukan salinan cache;
+- kertas **A4 landscape**, 11 kolom: No, No. Batch, Kode, Nama Produk,
+  Pelanggan, Rak, Masuk, Sisa, Satuan, ED, Kondisi;
+- ringkasan di atas (total batch, total sisa, pelanggan berstok) + baris TOTAL;
+- **Rekap per Pelanggan** muncul otomatis bila lebih dari satu pelanggan;
+- tiga kolom tanda tangan (Dibuat oleh / Diperiksa / Diterima);
+- jendela dibuka sinkron lebih dulu agar tidak diblokir popup, dengan pesan
+  "Menyiapkan laporan…" selama data dimuat.
+
+### Nomor batch bisa berupa angka
+
+Nomor batch dari pabrik bisa tersimpan sebagai **angka** di sheet (mis.
+`2609431`). Sebelumnya API mengembalikannya apa adanya sehingga tipe datanya
+campur (angka/teks). Sekarang `batchNumber` **selalu dikembalikan sebagai teks**
+di `stock.list`, `stock.available`, `sj.list`/`sj.get`, `pending.list`, dan
+`shipment.list`/`shipment.get`, agar kontrak API konsisten dan perbandingan
+nilai tidak meleset.
+
 **Bug harness self-test yang ditemukan & diperbaiki:** uji "hapus saat belum
 dipakai" memakai `created.pop()` yang membuang entri **terakhir**, bukan entri
 yang dihapus — akibatnya produk uji `TEST-P2` tertinggal di sheet milik

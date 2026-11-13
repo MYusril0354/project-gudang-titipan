@@ -38,7 +38,8 @@ function shipmentLineView_(line, ds) {
     qty: Number(line.qty || 0),
     colly: Number(line.colly || 0),
     receiptId: first.receipt_id || '',
-    batchNumber: first.batch_number || '',
+    // Bisa tersimpan sebagai angka di sheet; selalu keluarkan sebagai teks.
+    batchNumber: String(first.batch_number || ''),
     ed: receipt.ed || '',
     sjNo: first.sj_no || ''
   };

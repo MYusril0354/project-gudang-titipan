@@ -76,6 +76,8 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 │       ├── login.js           # logika halaman login
 │       ├── ui.js              # helper DOM (ikon SVG, modal, progress, tabel)
 │       ├── cache.js           # cache browser + stale-while-revalidate
+│       ├── print.js           # cetak surat jalan
+│       ├── print-stock.js     # cetak laporan posisi stok titipan
 │       ├── pages/*.js         # dashboard, penerimaan, pending, stok, pengiriman,
 │       │                      # kartu, laporan, master, pengguna, audit
 │       ├── modals/*.js        # sj, sj-create, shipment, user
@@ -93,7 +95,7 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 | Item | Nilai |
 | --- | --- |
 | Proyek Apps Script | Gudang Titipan API |
-| Deployment | Web App v39 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
+| Deployment | Web App v40 · `access: ANYONE_ANONYMOUS` · `executeAs: USER_DEPLOYING` |
 | Spreadsheet database | `database_gudang_titipan` (17 tabel) |
 | Zona waktu | `Asia/Jakarta` |
 | Endpoint | URL `/exec` sudah diisi di [frontend/js/config.js](frontend/js/config.js) |

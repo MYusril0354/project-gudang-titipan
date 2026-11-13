@@ -122,7 +122,9 @@ function batchView_(receipt, ds) {
 
   return {
     id: receipt.id,
-    batchNumber: receipt.batch_number || '',
+    // Nomor batch bisa tersimpan sebagai ANGKA di sheet (mis. 2609431).
+    // Selalu dikembalikan sebagai teks agar kontrak API konsisten.
+    batchNumber: String(receipt.batch_number || ''),
     date: receipt.date,
     ed: receipt.ed || '',
     qtyIn: Number(receipt.qty || 0),

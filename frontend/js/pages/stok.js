@@ -9,8 +9,9 @@ import { stock } from '../api.js';
 import { state, fmt, fmtDate } from '../state.js';
 import {
   el, panel, emptyBox, skeleton, errorBox, searchInput, statCard,
-  kodeTag, rakTag, batchTag, sub
+  kodeTag, rakTag, batchTag, sub, btn, toast
 } from '../ui.js';
+import { printStockPosition } from '../print-stock.js';
 
 export async function renderStokPage(view) {
   view.innerHTML = '';
@@ -45,6 +46,21 @@ export async function renderStokPage(view) {
         filter.q = v;
         state.filters.stok = v;
         load();
+      }),
+      btn('Cetak', {
+        title: 'Cetak laporan posisi stok sesuai filter',
+        onClick: async () => {
+          try {
+            const cust = state.master.customers.find((c) => c.id === filter.customerId);
+            await printStockPosition({
+              filter: { q: filter.q, customerId: filter.customerId },
+              customerName: cust ? cust.name : '',
+              keyword: filter.q
+            });
+          } catch (err) {
+            toast(err.message || 'Gagal menyiapkan cetak', 'err');
+          }
+        }
       })
     ],
     body: [tableWrap]
