@@ -12,7 +12,7 @@
  */
 
 import { shipment } from './api.js';
-import { state, fmt, fmtDate, findProduct, findCustomer } from './state.js';
+import { fmt, fmtDate, findProduct, findCustomer } from './state.js';
 
 /**
  * Cetak Surat Jalan untuk satu nomor pengiriman.
@@ -49,7 +49,8 @@ export async function printSuratJalan(no) {
  * @returns {string} HTML lengkap
  */
 export function buildDocument(data) {
-  const company = data.company || state.company || {};
+  // Kop perusahaan tidak dicetak (lihat catatan di PRINT_TEMPLATE), jadi data
+  // company tidak lagi dipakai di sini.
   const customer = data.customer || findCustomer(data.customerId);
   const rows = (data.lines || []).map((l, i) => {
     const p = findProduct(l.productId);
@@ -62,9 +63,6 @@ export function buildDocument(data) {
   const doc = document.implementation.createHTMLDocument('Surat Jalan ' + no_(data));
   doc.body.innerHTML = PRINT_TEMPLATE;
 
-  setText(doc, '#coName', company.name || '');
-  setText(doc, '#coAddr', [company.address, company.phone].filter(Boolean).join(' · '));
-  setText(doc, '#coEmail', company.email || '');
   setText(doc, '#docNo', no_(data));
   setText(doc, '#docDate', fmtDate(data.date));
 
@@ -125,10 +123,8 @@ const PRINT_TEMPLATE = `
   .kop-logo { width: 54px; height: 54px; border-radius: 10px; flex: none;
     background: #4f46e5; color: #fff; display: flex; align-items: center;
     justify-content: center; font-weight: 700; font-size: 18pt; }
-  .kop-text { flex: 1; min-width: 0; }
-  .kop-name { font-size: 15pt; font-weight: 700; }
   .kop-line { font-size: 9pt; color: #444; }
-  .kop-title { text-align: right; flex: none; }
+  .kop-title { margin-left: auto; text-align: right; flex: none; }
   .kop-title h1 { margin: 0; font-size: 15pt; letter-spacing: 3px; }
   .kop-no { font-family: 'Courier New', monospace; font-size: 11pt; font-weight: 700; }
 
@@ -157,13 +153,13 @@ const PRINT_TEMPLATE = `
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 <div class="sheet">
+  <!--
+    Kop perusahaan (nama, alamat, email) SENGAJA tidak dicetak — dokumen
+    biasanya dicetak di atas kertas berkop. Yang tampil hanya logo, judul
+    dokumen, nomor, dan tanggal.
+  -->
   <header class="kop">
     <div class="kop-logo"></div>
-    <div class="kop-text">
-      <div class="kop-name" id="coName"></div>
-      <div class="kop-line" id="coAddr"></div>
-      <div class="kop-line" id="coEmail"></div>
-    </div>
     <div class="kop-title">
       <h1>SURAT JALAN</h1>
       <div class="kop-no" id="docNo"></div>

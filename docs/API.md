@@ -173,6 +173,11 @@ status, podDate, printCount, totalQty, totalColly,
 lines[{productId,productCode,productName,unit,rackId,qty,colly,batchNumber,ed,sjNo}],
 company{}` — dipakai `frontend/js/print.js`. Pengiriman `VOID` ditolak.
 
+> `company{}` tetap dikirim demi kompatibilitas, tetapi **tidak dicetak**:
+> kop perusahaan (nama, alamat, email) sengaja dihilangkan dari dokumen karena
+> surat jalan umumnya dicetak di atas kertas berkop. Yang tampil di kop hanya
+> logo, judul **SURAT JALAN**, nomor, dan tanggal.
+
 **Susunan dokumen cetak (surat jalan):** kolom
 `#, Kode, Produk, No. Batch, ED, SJ Asal, Qty, Colly` — kolom **Rak dihilangkan**,
 dan blok kanan atas berlabel **Ekspedisi** (bukan Pengangkutan/Sopir/Kendaraan).

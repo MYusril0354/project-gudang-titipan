@@ -151,6 +151,12 @@ header, dijalankan lewat `system.migrate`). Form pengiriman juga otomatis
 memilih pelanggan pertama yang **masih punya stok**, supaya tidak langsung
 tampak "tidak ada batch tersedia".
 
+**Kop perusahaan dihilangkan dari cetakan.** Nama perusahaan, alamat, dan email
+tidak lagi dicetak karena surat jalan umumnya dicetak di atas kertas berkop.
+Yang tampil di kop hanya logo, judul **SURAT JALAN**, nomor, dan tanggal.
+Properti `COMPANY_*` dan `company{}` pada respons `printData` tetap ada
+(kompatibilitas), hanya tidak dirender.
+
 **Bug harness self-test yang ditemukan & diperbaiki:** uji "hapus saat belum
 dipakai" memakai `created.pop()` yang membuang entri **terakhir**, bukan entri
 yang dihapus — akibatnya produk uji `TEST-P2` tertinggal di sheet milik
