@@ -409,6 +409,75 @@ function updateById_(name, key, patch) {
   return current;
 }
 
+/**
+ * Update BANYAK baris sekaligus: satu `getValues` + satu `setValues`.
+ *
+ * Dipakai jalur tulis massal (mis. "Fisik Terima" semua baris) agar tidak
+ * membayar 2 round-trip sheet per baris seperti `updateById_` berulang.
+ *
+ * Bila baris yang diubah tersebar sangat jauh, helper ini jatuh ke
+ * `updateById_` per baris supaya tidak membaca/menulis ribuan baris kosong.
+ *
+ * @param {string} name nama tabel
+ * @param {Object<string, Object>} patches peta key -> patch kolom
+ * @returns {number} jumlah baris yang diubah
+ */
+function updateManyById_(name, patches) {
+  var keys = Object.keys(patches || {});
+  if (!keys.length) return 0;
+  if (keys.length === 1) return updateById_(name, keys[0], patches[keys[0]]) ? 1 : 0;
+
+  var sh = sheet_(name);
+  var headers = HEADERS_[name];
+  var keyCol = headers.indexOf(idKey_(name)) + 1;
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return 0;
+
+  var keyValues = sh.getRange(2, keyCol, lastRow - 1, 1).getValues();
+  var rowByKey = {};
+  for (var i = 0; i < keyValues.length; i++) {
+    var k = String(keyValues[i][0]);
+    if (k) rowByKey[k] = i + 2;
+  }
+
+  var rowIdx = [];
+  var found = {};
+  for (var j = 0; j < keys.length; j++) {
+    var r = rowByKey[String(keys[j])];
+    if (!r) continue;
+    rowIdx.push(r);
+    found[String(keys[j])] = r;
+  }
+  if (!rowIdx.length) return 0;
+
+  var minRow = Math.min.apply(null, rowIdx);
+  var maxRow = Math.max.apply(null, rowIdx);
+
+  // Batas wajar: jangan baca rentang raksasa hanya untuk beberapa baris.
+  if (maxRow - minRow + 1 > Math.max(2000, rowIdx.length * 50)) {
+    var changed = 0;
+    for (var m = 0; m < keys.length; m++) {
+      if (updateById_(name, keys[m], patches[keys[m]])) changed++;
+    }
+    return changed;
+  }
+
+  var block = sh.getRange(minRow, 1, maxRow - minRow + 1, headers.length).getValues();
+  Object.keys(found).forEach(function (key) {
+    var offset = found[key] - minRow;
+    var patch = patches[key] || {};
+    Object.keys(patch).forEach(function (col) {
+      var c = headers.indexOf(col);
+      if (c === -1) return;
+      block[offset][c] = patch[col] === undefined || patch[col] === null ? '' : patch[col];
+    });
+  });
+
+  sh.getRange(minRow, 1, block.length, headers.length).setValues(block);
+  invalidateReadCache_(name);
+  return Object.keys(found).length;
+}
+
 /** Hapus baris berdasarkan kunci. */
 function deleteById_(name, key) {
   var idx = rowIndexByKey_(name, key);

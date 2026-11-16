@@ -140,6 +140,53 @@ function systemSelfTest_(params, ctx) {
     }
   }
 
+  /* ---------- TULIS MASSAL (updateManyById_) & RAK TANPA NAMA ---------- */
+  // `updateManyById_` dipakai "Fisik Terima" semua baris (satu getValues +
+  // satu setValues, bukan 2 round-trip sheet per baris). Diuji pada tabel
+  // `racks` supaya tidak menyentuh stok.
+  var bulkRacks = [];
+  if (loc) {
+    check('rack: tanpa nama diterima (kolom nama tidak dipakai UI)', true, function () {
+      return track('rack', masterCreate_({ entity: 'rack', values: { code: 'zz-tanpa-nama', locationId: loc.id } }, admin));
+    });
+
+    check('tulis massal: siapkan 3 rak uji', true, function () {
+      for (var b = 1; b <= 3; b++) {
+        bulkRacks.push(track('rack', masterCreate_({
+          entity: 'rack',
+          values: { code: 'ZZ-BULK-' + b, locationId: loc.id }
+        }, admin)).id);
+      }
+      return bulkRacks.length === 3;
+    });
+
+    check('tulis massal: 3 baris diubah sekali tulis', true, function () {
+      var patches = {};
+      bulkRacks.forEach(function (id, idx) { patches[id] = { name: 'BULK-' + idx }; });
+      var changed = updateManyById_('racks', patches);
+      if (changed !== 3) throw new Error('jumlah baris terubah = ' + changed);
+
+      var byId = {};
+      readTable_('racks').forEach(function (r) { byId[String(r.id)] = r; });
+      bulkRacks.forEach(function (id, idx) {
+        var row = byId[String(id)];
+        if (!row || String(row.name) !== 'BULK-' + idx) {
+          throw new Error('baris ' + id + ' tidak ikut berubah');
+        }
+      });
+      return true;
+    });
+
+    check('tulis massal: kunci tidak dikenal diabaikan', true, function () {
+      var changed = updateManyById_('racks', {
+        'tidak-ada-1': { name: 'x' },
+        'tidak-ada-2': { name: 'y' }
+      });
+      if (changed !== 0) throw new Error('seharusnya 0, dapat ' + changed);
+      return true;
+    });
+  }
+
   /* ---------- ENTITY TIDAK DIKENAL ---------- */
   check('entity tidak dikenal ditolak', 'VALIDATION_ERROR', function () {
     return masterList_({ entity: 'supplier' }, admin);

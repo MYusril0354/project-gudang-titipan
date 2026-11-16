@@ -54,6 +54,7 @@ function userCreate_(params, ctx) {
     updated_by: ctx.username
   };
   appendRow_('users', row);
+  bumpAuthEpoch_(); // cache sesi lama tidak boleh menyajikan data user yang usang
   audit_(ctx, 'user.create', 'user', row.id, { username: username, role: role });
 
   return { id: row.id, username: username, nama: nama, role: role, aktif: true };
@@ -95,6 +96,7 @@ function userUpdate_(params, ctx) {
   patch.updated_at = nowStamp_();
   patch.updated_by = ctx.username;
   updateById_('users', id, patch);
+  bumpAuthEpoch_(); // peran/nonaktif langsung berlaku, tidak menunggu TTL cache
   audit_(ctx, 'user.update', 'user', id, values);
 
   return { id: id, username: target.username, nama: patch.nama || target.nama, role: patch.role || target.role };
@@ -118,6 +120,7 @@ function userResetPassword_(params, ctx) {
     updated_at: nowStamp_(),
     updated_by: ctx.username
   });
+  bumpAuthEpoch_(); // sesi lama dipaksa memuat ulang data user
   audit_(ctx, 'user.resetPassword', 'user', id, { username: found[0].username });
 
   return { reset: true, id: id };

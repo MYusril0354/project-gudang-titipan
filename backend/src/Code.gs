@@ -98,6 +98,7 @@ function doGet(e) {
 /** Router utama untuk semua action. */
 function doPost(e) {
   var res;
+  AUDIT_BUFFER_ = []; // state global tidak boleh terbawa dari request sebelumnya
   try {
     var req = parseRequest_(e);
     var handler = ROUTES[req.action];
@@ -109,16 +110,27 @@ function doPost(e) {
     var ctx = handler.public ? null : requireSession_(req.token, handler.roles);
     var params = req.params || {};
 
-    var data = handler.write
-      ? withLock_(function () {
+    var data;
+    if (handler.write) {
+      data = withLock_(function () {
+        try {
           return idempotent_(req.requestId, function () { return handler.fn(params, ctx); });
-        })
-      : handler.fn(params, ctx);
+        } finally {
+          // Audit ditulis sekali per request, di dalam lock (anti baris bertabrakan).
+          flushAudit_();
+        }
+      });
+    } else {
+      data = handler.fn(params, ctx);
+    }
 
     res = { ok: true, data: data, meta: { serverTime: nowIso_() } };
   } catch (err) {
     res = { ok: false, error: toErrorPayload_(err) };
     logError_(err, e);
+  } finally {
+    // Sisa audit (aksi baca, atau error sebelum lock) tetap diselamatkan.
+    flushAudit_();
   }
   return jsonOut_(res);
 }

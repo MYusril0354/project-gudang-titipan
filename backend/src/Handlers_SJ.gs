@@ -979,13 +979,45 @@ function sjReceiveAll_(params, ctx) {
   });
 
   // ---- Eksekusi ----
+  // Semua tulisan dikumpulkan dulu lalu ditulis sekaligus (appendRows_ /
+  // updateManyById_) supaya 10 baris tidak menjadi 30-40 round-trip sheet.
   var now = nowStamp_();
   var received = [];
 
-  plan.forEach(function (p) {
-    var batchNumber = p.batchNumber || nextBatchNumber_(date);
+  // Penomoran batch dibuat lokal dari satu pembacaan counter, lalu counter
+  // ditulis SEKALI di akhir. Nomor tetap unik karena dicek ke daftar batch
+  // yang sudah ada + batch yang baru dipakai pada request ini.
+  var batchKey = 'BATCH-' + date.replace(/-/g, '');
+  var batchPrefix = 'BN-' + date.replace(/-/g, '') + '-';
+  var usedBatches = {};
+  allReceipts.forEach(function (r) {
+    var b = String(r.batch_number || '').toUpperCase();
+    if (b) usedBatches[b] = true;
+  });
+  var batchBase = Number(getCounter_(batchKey) || 0);
+  var batchGenerated = false;
 
-    appendRow_('receipts', {
+  function takeBatchNumber_() {
+    for (var guard = 0; guard < 1000; guard++) {
+      batchBase++;
+      var candidate = formatSeq_(batchPrefix, batchBase, 3);
+      if (!usedBatches[candidate]) {
+        usedBatches[candidate] = true;
+        batchGenerated = true;
+        return candidate;
+      }
+    }
+    throw apiError_('INTERNAL', 'Gagal menentukan No. Batch baru.');
+  }
+
+  var receiptRows = [];
+  var movementRows = [];
+  var linePatches = {};
+
+  plan.forEach(function (p) {
+    var batchNumber = p.batchNumber || takeBatchNumber_();
+
+    receiptRows.push({
       id: newId_(),
       sj_line_id: p.lineId,
       qty: p.qty,
@@ -1001,7 +1033,7 @@ function sjReceiveAll_(params, ctx) {
       updated_by: ctx.username
     });
 
-    appendRow_('movements', {
+    movementRows.push({
       id: newId_(),
       date: date,
       type: 'CONSIGN_IN',
@@ -1016,11 +1048,11 @@ function sjReceiveAll_(params, ctx) {
       created_at: now
     });
 
-    updateById_('sj_lines', p.lineId, {
+    linePatches[String(p.lineId)] = {
       decision: 'DONE',
       updated_at: now,
       updated_by: ctx.username
-    });
+    };
 
     received.push({
       lineId: p.lineId,
@@ -1033,6 +1065,11 @@ function sjReceiveAll_(params, ctx) {
       qty: p.qty
     });
   });
+
+  if (receiptRows.length) appendRows_('receipts', receiptRows);
+  if (movementRows.length) appendRows_('movements', movementRows);
+  updateManyById_('sj_lines', linePatches);
+  if (batchGenerated) setCounter_(batchKey, batchBase);
 
   var sjStatus = sjRefreshStatus_(sjNo, ctx);
   var totalQty = received.reduce(function (a, r) { return a + r.qty; }, 0);

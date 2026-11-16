@@ -11,6 +11,23 @@
 /** Masa berlaku token sesi (jam) — PRD bagian 9. */
 var SESSION_TTL_HOURS = 12;
 
+/**
+ * Umur cache konteks sesi (detik).
+ *
+ * Sesi & user dulu dibaca dari sheet di SETIAP request (2 getValues per
+ * request). Sekarang hasilnya di-cache di CacheService selama 60 detik:
+ * pencabutan dari dalam aplikasi tetap seketika karena kunci cache dibuang
+ * eksplisit (logout / ubah user / reset password), sedangkan perubahan
+ * langsung di sheet berlaku paling lambat 60 detik.
+ */
+var SESSION_CACHE_SEC_ = 60;
+
+/** Kunci "epoch" otorisasi: dinaikkan saat data user berubah. */
+var AUTH_EPOCH_KEY_ = 'gt_auth_epoch_v1';
+
+/** TTL epoch (detik) — cukup lama; entri sesi sendiri hanya 60 detik. */
+var AUTH_EPOCH_TTL_SEC_ = 21600;
+
 /** Maksimum percobaan login gagal sebelum dikunci. */
 var MAX_FAILED_LOGIN = 5;
 
@@ -42,11 +59,101 @@ function requireSession_(token, allowedRoles) {
   return ctx;
 }
 
+/* =========================================================
+   CACHE SESI (optimasi kinerja)
+   ---------------------------------------------------------
+   Epoch dipakai agar perubahan data user langsung berlaku: saat user
+   diubah/dinonaktifkan, epoch naik -> semua kunci sesi lama tidak lagi
+   cocok, sehingga konteks dibaca ulang dari sheet.
+   ========================================================= */
+
+/** Penyimpan cache script, atau null bila tidak tersedia. */
+function scriptCache_() {
+  try {
+    return CacheService.getScriptCache();
+  } catch (ignore) {
+    return null;
+  }
+}
+
+/** Nilai epoch otorisasi saat ini (string). */
+function authEpoch_() {
+  var cache = scriptCache_();
+  if (!cache) return '0';
+  try {
+    return cache.get(AUTH_EPOCH_KEY_) || '0';
+  } catch (ignore) {
+    return '0';
+  }
+}
+
+/** Naikkan epoch: semua cache sesi lama otomatis tidak terpakai. */
+function bumpAuthEpoch_() {
+  var cache = scriptCache_();
+  if (!cache) return false;
+  try {
+    cache.put(AUTH_EPOCH_KEY_, String(Number(authEpoch_() || 0) + 1), AUTH_EPOCH_TTL_SEC_);
+    return true;
+  } catch (ignore) {
+    return false;
+  }
+}
+
+/** Kunci cache konteks satu token pada epoch tertentu. */
+function sessionCacheKey_(token, epoch) {
+  return 'gt_sess_' + epoch + '_' + String(token).slice(0, 48);
+}
+
+/** Buang cache konteks satu token (dipakai saat logout). */
+function dropSessionCache_(token) {
+  var cache = scriptCache_();
+  if (!cache) return false;
+  try {
+    cache.remove(sessionCacheKey_(token, authEpoch_()));
+    return true;
+  } catch (ignore) {
+    return false;
+  }
+}
+
+/** Susun konteks sesi dari baris user. */
+function sessionCtxFrom_(user, token) {
+  return {
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    nama: user.nama,
+    token: token
+  };
+}
+
 /**
- * Baca token dari sheet `sessions`, cek kedaluwarsa, lalu muat usernya.
+ * Baca token dari cache sesi, atau dari sheet `sessions` bila cache kosong.
+ * Selalu memeriksa `expires_at` walau konteks diambil dari cache.
  * @returns {Object|null}
  */
 function loadSession_(token) {
+  var cache = scriptCache_();
+  var cacheKey = null;
+  if (cache) {
+    cacheKey = sessionCacheKey_(token, authEpoch_());
+    try {
+      var raw = cache.get(cacheKey);
+      if (raw) {
+        var c = JSON.parse(raw);
+        if (c && c.expiresAt && String(c.expiresAt) > nowStamp_()) {
+          return {
+            userId: c.userId,
+            username: c.username,
+            role: c.role,
+            nama: c.nama,
+            token: token
+          };
+        }
+      }
+    } catch (ignore) { /* cache rusak -> jatuh ke pembacaan sheet */ }
+  }
+
   var sessions = readTableWhere_('sessions', { token: token });
   if (!sessions.length) return null;
 
@@ -63,13 +170,21 @@ function loadSession_(token) {
   var user = users[0];
   if (!isTrue_(user.aktif)) return null;
 
-  return {
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-    nama: user.nama,
-    token: token
-  };
+  var ctx = sessionCtxFrom_(user, token);
+
+  if (cache && cacheKey) {
+    try {
+      cache.put(cacheKey, JSON.stringify({
+        userId: ctx.userId,
+        username: ctx.username,
+        role: ctx.role,
+        nama: ctx.nama,
+        expiresAt: session.expires_at
+      }), SESSION_CACHE_SEC_);
+    } catch (ignore) { /* kegagalan cache tidak boleh menggagalkan request */ }
+  }
+
+  return ctx;
 }
 
 /** Buat token sesi baru dan simpan. */
@@ -154,6 +269,7 @@ function authLogin_(params) {
 function authLogout_(params, ctx) {
   if (ctx && ctx.token) {
     deleteById_('sessions', ctx.token);
+    dropSessionCache_(ctx.token); // konteks cache dibuang -> token tidak bisa dipakai lagi
     audit_(ctx, 'auth.logout', 'user', ctx.userId, 'Logout');
   }
   return { loggedOut: true };
@@ -189,7 +305,16 @@ function makeSalt_() {
 
 /* =========================================================
    AUDIT
+   ---------------------------------------------------------
+   Audit dikumpulkan di memori lalu ditulis SEKALI per request
+   (`appendRows_`). Penghematan: satu aksi tulis yang mencatat beberapa
+   peristiwa tidak lagi membayar satu round-trip sheet per baris.
+   Penulisan dilakukan di dalam lock (lihat Code.gs) supaya aman dari
+   dua request bersamaan.
    ========================================================= */
+
+/** Baris audit yang menunggu ditulis pada request ini. */
+var AUDIT_BUFFER_ = [];
 
 /** Catat aksi tulis ke audit_log. */
 function audit_(ctx, action, entity, entityId, detail) {
@@ -200,7 +325,7 @@ function audit_(ctx, action, entity, entityId, detail) {
 /** Versi audit tanpa ctx (dipakai sebelum sesi terbentuk, mis. login). */
 function auditRaw_(username, action, entity, entityId, detail) {
   try {
-    appendRow_('audit_log', {
+    AUDIT_BUFFER_.push({
       id: newId_(),
       timestamp: nowStamp_(),
       user: username || 'system',
@@ -211,6 +336,23 @@ function auditRaw_(username, action, entity, entityId, detail) {
     });
   } catch (ignore) { /* audit tidak boleh menggagalkan aksi utama */ }
   return true;
+}
+
+/**
+ * Tulis semua audit yang terkumpul pada request ini.
+ * Tidak pernah melempar error (audit tidak boleh menggagalkan aksi).
+ * @returns {number} jumlah baris yang ditulis
+ */
+function flushAudit_() {
+  if (!AUDIT_BUFFER_.length) return 0;
+  var rows = AUDIT_BUFFER_;
+  AUDIT_BUFFER_ = [];
+  try {
+    appendRows_('audit_log', rows);
+    return rows.length;
+  } catch (ignore) {
+    return 0;
+  }
 }
 
 /* =========================================================

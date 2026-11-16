@@ -45,7 +45,10 @@ function isLocked_() {
 
 /** Lempar FORBIDDEN bila sistem terkunci dan action termasuk sensitif. */
 function assertNotLocked_(action) {
-  if (isLocked_() && SENSITIVE_ACTIONS_.indexOf(String(action)) !== -1) {
+  // Keluar lebih dulu: membaca Script Properties adalah service call yang
+  // tidak perlu dibayar oleh action biasa (mayoritas request).
+  if (SENSITIVE_ACTIONS_.indexOf(String(action)) === -1) return;
+  if (isLocked_()) {
     throw apiError_('FORBIDDEN',
       'Sistem dalam mode produksi terkunci. Action "' + action + '" dinonaktifkan.');
   }

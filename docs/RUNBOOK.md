@@ -169,6 +169,40 @@ Sementara ini, pantau lewat tab Error Log.
 
 ## 8. Risiko & batasan yang diketahui
 
+### Kinerja — optimasi P1 (diukur 2026-11-16, p50, n=8–12 per endpoint)
+
+Empat perubahan yang tidak mengubah kontrak API maupun aturan keamanan:
+
+1. **Cache konteks sesi 60 detik** (`CacheService`). Sesi + user tidak lagi
+   dibaca dari sheet di setiap request. Pencabutan tetap **seketika** untuk
+   logout/ubah user/reset password karena kunci cache dibuang eksplisit, dan
+   setiap perubahan data user menaikkan `epoch` otorisasi sehingga konteks
+   lama tidak cocok lagi. Perubahan langsung di sheet berlaku ≤60 detik.
+2. **Cek `PROD_LOCK` hanya untuk action sensitif** (`system.setup`,
+   `system.selfTest`). Action lain tidak lagi membayar satu service call
+   `PropertiesService` per request.
+3. **Audit ditulis sekali per request** (`appendRows_`), dikumpulkan di memori
+   dan di-flush di dalam lock. Isi audit tidak berkurang; aksi yang mencatat
+   beberapa peristiwa tidak lagi membayar satu round-trip per baris.
+4. **"Fisik Terima" semua baris ditulis batch** (`appendRows_` +
+   `updateManyById_`). Sebelumnya 10 baris ≈ 30–40 round-trip sheet
+   (2 append + 1 update baca+tulis per baris), sekarang ±4.
+
+| Endpoint | p50 sebelum | p50 sesudah | Perubahan |
+| --- | --- | --- | --- |
+| `system.health` (tanpa sheet) | 1,72 dtk | 1,65 dtk | — (lantai platform) |
+| `system.bootstrap` | 3,66 dtk | 2,05 dtk | **−44%** |
+| `master.list` rack | 3,35 dtk | 2,03 dtk | **−40%** |
+| `master.list` product | 2,88 dtk | 1,85 dtk | **−36%** |
+| `pending.list` | 5,21 dtk | 3,42 dtk | **−34%** |
+| `stock.list` | 4,98 dtk | 4,28 dtk | −14% |
+| `dashboard.summary` | 4,49 dtk | 3,99 dtk | −11% |
+| `sj.list` | 3,67 dtk | 3,69 dtk | — (derau) |
+
+Sisa waktu tetap didominasi lantai platform (~1,6 dtk) dan pembacaan tabel
+transaksi yang harus segar. Regresi diuji lewat `system.selfTest`
+(24/24 lulus, termasuk uji `updateManyById_` dan rak tanpa nama).
+
 ### Kinerja (diukur 2026-11-13, uji beban kecil)
 
 **Batas bawah platform.** `curl` ke `/exec` menunjukkan TTFB **1,06–1,38 dtk**
