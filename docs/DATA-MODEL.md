@@ -21,7 +21,7 @@ Kolom `id` diisi server. Semua tabel punya `created_at`, `created_by`, `updated_
 | `shipment_lines` | id, shipment_no, product_id, rack_id, qty, **colly** |
 | `shipment_consumptions` | id, shipment_line_id, receipt_id, sj_no, batch_number, qty |
 | `movements` | id, date, type (CONSIGN_IN/CONSIGN_OUT/VOID_OUT), ref, product_id, customer_id, rack_id, qty (+/−), batch_number, sj_ref, note |
-| `counters` | key (mis. `SJ-2026`, `DO-TTR`, `BATCH-20261111`), value |
+| `counters` | key (mis. `SJ-2026`, `DO-2611`, `BATCH-20261111`), value |
 | `audit_log` | id, timestamp, user, action, entity, entity_id, detail |
 | `error_log` | id, timestamp, code, message, stack, request |
 
@@ -65,7 +65,7 @@ status baris (urutan evaluasi):
 | --- | --- | --- |
 | Surat Jalan | `SJ/{tahun}/{urut 4 digit}` | `SJ-{tahun}` |
 | Batch | `BN-{YYYYMMDD}-{urut 3 digit}` | `BATCH-{YYYYMMDD}` |
-| Pengiriman | `DO-TTR-{urut 3 digit}` | `DO-TTR` |
+| Pengiriman (DO) | `DNTTP-{YYMM}-{urut 3 digit, lanjut 4 bila >999}` — reset tiap bulan | `DO-{YYMM}` |
 
 ## Seed Awal
 

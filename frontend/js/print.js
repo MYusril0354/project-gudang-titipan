@@ -22,7 +22,7 @@ import { fmt, fmtDate, findProduct, findCustomer } from './state.js';
  * diblokir, `print_count` tidak ikut naik (server hanya menambah saat data
  * cetak benar-benar diminta).
  *
- * @param {string} no nomor DO, mis. 'DO-TTR-001'
+ * @param {string} no nomor DO, mis. 'DNTTP-2611-001'
  */
 export async function printSuratJalan(no) {
   const win = window.open('', '_blank');

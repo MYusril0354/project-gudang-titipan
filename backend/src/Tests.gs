@@ -213,6 +213,31 @@ function systemSelfTest_(params, ctx) {
     return true;
   });
 
+  /* ---------- NOMOR PENGIRIMAN (DO) ---------- */
+  check('nomor DO: November 2026 -> DNTTP-2611-001', true, function () {
+    var got = formatSeq_(doNumberPrefix_(new Date(2026, 10, 16, 12, 0, 0)), 1, DO_SEQ_PAD_);
+    if (got !== 'DNTTP-2611-001') throw new Error('dapat ' + got);
+    return true;
+  });
+
+  check('nomor DO: Desember 2026 reset ke 001', true, function () {
+    var got = formatSeq_(doNumberPrefix_(new Date(2026, 11, 1, 12, 0, 0)), 1, DO_SEQ_PAD_);
+    if (got !== 'DNTTP-2612-001') throw new Error('dapat ' + got);
+    return true;
+  });
+
+  check('nomor DO: Januari 2027 -> DNTTP-2701-001', true, function () {
+    var got = formatSeq_(doNumberPrefix_(new Date(2027, 0, 2, 12, 0, 0)), 1, DO_SEQ_PAD_);
+    if (got !== 'DNTTP-2701-001') throw new Error('dapat ' + got);
+    return true;
+  });
+
+  check('nomor DO: urutan lewat 999 lanjut 4 digit', true, function () {
+    var got = formatSeq_(doNumberPrefix_(new Date(2026, 10, 30, 12, 0, 0)), 1000, DO_SEQ_PAD_);
+    if (got !== 'DNTTP-2611-1000') throw new Error('dapat ' + got);
+    return true;
+  });
+
   /* ---------- ENTITY TIDAK DIKENAL ---------- */
   check('entity tidak dikenal ditolak', 'VALIDATION_ERROR', function () {
     return masterList_({ entity: 'supplier' }, admin);

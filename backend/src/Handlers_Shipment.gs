@@ -103,13 +103,59 @@ function parseColly_(value, lineIndex) {
   return found[0];
 }
 
-/** Nomor DO final dari counter terpisah (PRD 6.7). */
+/**
+ * Awalan nomor Pengiriman (DO) — tetap.
+ * @type {string}
+ */
+var DO_PREFIX_ = 'DNTTP';
+
+/** Panjang minimum nomor urut pada nomor DO. */
+var DO_SEQ_PAD_ = 3;
+
+/**
+ * Periode nomor DO (`yyMM`) untuk satu tanggal.
+ * @param {Date} [date] tanggal acuan; default sekarang
+ * @returns {string} mis. `2611`
+ */
+function doNumberPeriod_(date) {
+  return Utilities.formatDate(date || new Date(), TZ_, 'yyMM');
+}
+
+/**
+ * Awalan nomor DO untuk satu tanggal: `DNTTP-YYMM-`.
+ *
+ * YY = dua digit terakhir tahun, MM = dua digit bulan, memakai zona waktu
+ * server (lihat `TZ_`).
+ *
+ * @param {Date} [date] tanggal acuan; default sekarang
+ * @returns {string} mis. `DNTTP-2611-`
+ */
+function doNumberPrefix_(date) {
+  return DO_PREFIX_ + '-' + doNumberPeriod_(date) + '-';
+}
+
+/**
+ * Nomor Pengiriman (DO) berikutnya: `DNTTP-YYMM-NNN`.
+ *
+ * Aturan:
+ *  - YYMM diambil dari TANGGAL SISTEM saat dokumen dibuat.
+ *  - Counter dipisah per periode (mis. `DO-2611`), jadi urutan otomatis mulai
+ *    `001` lagi begitu bulan berganti — tanpa reset manual atau cron.
+ *  - Lewat 999 nomor lanjut 4 digit (`1000`) dengan awalan yang sama.
+ *  - Nomor yang sudah ada dilewati (anti dobel). Dipanggil di dalam lock.
+ *
+ * @returns {string}
+ */
 function nextShipmentNumber_() {
+  var period = doNumberPeriod_(new Date());
+  var prefix = DO_PREFIX_ + '-' + period + '-';
+  var counterKey = 'DO-' + period;
+
   var existing = {};
   readTable_('shipments').forEach(function (s) { existing[String(s.no).toUpperCase()] = true; });
 
-  for (var guard = 0; guard < 1000; guard++) {
-    var candidate = formatSeq_('DO-TTR-', nextCounter_('DO-TTR'), 3);
+  for (var guard = 0; guard < 5000; guard++) {
+    var candidate = formatSeq_(prefix, nextCounter_(counterKey), DO_SEQ_PAD_);
     if (!existing[candidate]) return candidate;
   }
   throw apiError_('INTERNAL', 'Gagal menentukan nomor pengiriman baru.');

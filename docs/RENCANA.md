@@ -228,7 +228,7 @@ pengiriman non-DRAFT/non-VOID (PRD 6.6). Satu batch = satu baris `receipts`.
 
 - `stock.list` — posisi stok per batch (sisa > 0) + ringkasan qty per pelanggan
 - `stock.available` — batch tersedia milik satu pelanggan (dasar form pengiriman)
-- `shipment.create` — nomor `DO-TTR-{urut 3}` dari counter terpisah, langsung `SHIPPED`,
+- `shipment.create` — nomor `DNTTP-{YYMM}-{urut 3}` dari counter per bulan (reset otomatis), langsung `SHIPPED`,
   menyimpan `shipment_lines` + `shipment_consumptions` (jejak batch + SJ asal) + mutasi `CONSIGN_OUT`
 - `shipment.list` / `shipment.get` — daftar & detail + jumlah cetak
 - `shipment.markDelivered` — `DELIVERED` + tanggal POD (tidak boleh sebelum tanggal kirim)

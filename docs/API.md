@@ -164,9 +164,20 @@ Balasan: `{ customerId, items[], totals:{batches,qty} }` — hanya batch bersisa
 - `colly` = jumlah koli per baris; opsional, kosong dianggap `0`, maksimal
   100.000. Tercetak sebagai kolom **Colly** dengan **total Colly** di baris Total.
 
-Nomor `DO-TTR-{urut 3}` diambil dari counter terpisah. Status langsung `SHIPPED`
-(langsung memotong stok). Validasi stok **diulang di server di dalam lock** dan
-mengakumulasi baris yang memakai batch sama.
+Nomor pengiriman `DNTTP-YYMM-NNN` dibuat otomatis oleh server:
+
+- `YY` dua digit terakhir tahun, `MM` dua digit bulan — diambil dari **tanggal
+  sistem** saat dokumen dibuat (bukan tanggal kirim yang diisi user).
+- `NNN` nomor urut 3 digit mulai `001`; counter dipisah per bulan (`DO-2611`),
+  jadi urutan **otomatis mulai 001 lagi** saat bulan berganti tanpa reset manual.
+- Lewat 999 nomor lanjut 4 digit (`DNTTP-2611-1000`).
+- Nomor yang sudah ada dilewati; pembuatan nomor berjalan di dalam lock sehingga
+  dua input bersamaan tidak dapat nomor kembar.
+- Nomor lama (`DO-TTR-001`) dibiarkan apa adanya.
+
+Contoh: `DNTTP-2611-001`, `DNTTP-2611-002`, … lalu `DNTTP-2612-001` pada Desember.
+Status langsung `SHIPPED` (langsung memotong stok). Validasi stok **diulang di
+server di dalam lock** dan mengakumulasi baris yang memakai batch sama.
 
 Error: `INSUFFICIENT_STOCK` (qty > sisa), `VALIDATION_ERROR` (batch bukan milik
 pelanggan / produk tidak cocok / colly tidak wajar), `NOT_FOUND` (batch hilang).
@@ -174,7 +185,7 @@ pelanggan / produk tidak cocok / colly tidak wajar), `NOT_FOUND` (batch hilang).
 ### `shipment.markDelivered`
 
 ```json
-{ "action": "shipment.markDelivered", "params": { "no": "DO-TTR-001", "podDate": "2026-11-13" } }
+{ "action": "shipment.markDelivered", "params": { "no": "DNTTP-2611-001", "podDate": "2026-11-13" } }
 ```
 
 `podDate` opsional (default hari ini) dan tidak boleh sebelum tanggal kirim.
@@ -183,7 +194,7 @@ Pengiriman `VOID` ditolak; yang sudah `DELIVERED` dikembalikan apa adanya.
 ### `shipment.printData`
 
 ```json
-{ "action": "shipment.printData", "params": { "no": "DO-TTR-001" } }
+{ "action": "shipment.printData", "params": { "no": "DNTTP-2611-001" } }
 ```
 
 Menaikkan `print_count` + menyimpan `last_printed_at`. Balasan berisi
@@ -205,7 +216,7 @@ Baris Total memuat **total Qty** dan **total Colly**.
 ### `shipment.void`
 
 ```json
-{ "action": "shipment.void", "params": { "no": "DO-TTR-001", "reason": "salah input qty" } }
+{ "action": "shipment.void", "params": { "no": "DNTTP-2611-001", "reason": "salah input qty" } }
 ```
 
 ADMIN saja, `reason` wajib. Status menjadi `VOID`; stok kembali otomatis karena

@@ -186,11 +186,12 @@ function seedCounters_() {
   if (rows.length > 0) return { created: 0, existing: rows.length };
 
   var year = todayStr_().slice(0, 4);
+  // Counter DO tidak disemai: nomor pengiriman memakai counter per periode
+  // bulan (mis. `DO-2611`) yang dibuat otomatis saat dokumen pertama dibuat.
   appendRows_('counters', [
-    { key: 'SJ-' + year, value: 0 },
-    { key: 'DO-TTR', value: 0 }
+    { key: 'SJ-' + year, value: 0 }
   ]);
-  return { created: 2, existing: 0 };
+  return { created: 1, existing: 0 };
 }
 
 /* =========================================================
