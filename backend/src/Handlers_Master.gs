@@ -166,7 +166,6 @@ function validateMaster_(entity, row, existing) {
 
   if (entity === 'rack') {
     assertRequired_(row.code, 'code', 'Kode rak');
-    assertRequired_(row.name, 'name', 'Nama rak');
     assertRequired_(row.location_id, 'locationId', 'Gudang');
     assertUnique_('racks', 'code', row.code, id);
     var loc = readTableWhere_('locations', { id: row.location_id });
@@ -294,7 +293,7 @@ var IMPORT_ORDER_ = {
   product: ['code', 'name', 'unit'],
   customer: ['code', 'name', 'address', 'phone'],
   location: ['type', 'name', 'customer'],
-  rack: ['code', 'name', 'location']
+  rack: ['code', 'location']
 };
 
 /** Nama kolom yang dikenali di baris header (Indonesia & Inggris). */

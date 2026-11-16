@@ -43,9 +43,9 @@ const ENTITY_INFO = {
   },
   rack: {
     label: 'Rak',
-    fields: 'kode, nama, gudang',
-    sample: 'kode,nama,gudang\nF-01-01,Rak F1 Level 1,Gudang Utama',
-    note: 'Kolom gudang diisi NAMA gudang (gudang tidak punya kode), mis. "Gudang Utama".'
+    fields: 'kode, gudang',
+    sample: 'kode,gudang\nF-01-01,Gudang Utama',
+    note: 'Rak cukup kode. Kolom gudang diisi NAMA gudang (gudang tidak punya kode), mis. "Gudang Utama".'
   }
 };
 

@@ -46,7 +46,7 @@ export async function openReceive(line, onDone) {
   // ED: diisi dari rencana SJ bila ada, boleh diubah; tersimpan pada batch.
   const edInput = el('input', { type: 'date', value: line.plannedEd || '' });
   const rackSelect = select(
-    racks.map((r) => ({ value: r.id, label: `${r.code} — ${r.name}` })),
+    racks.map((r) => ({ value: r.id, label: String(r.code || '—') })),
     racks[0] ? racks[0].id : ''
   );
   const kondisiSelect = select(state.constants.kondisi || ['Baik', 'Rusak sebagian'], 'Baik');
@@ -204,7 +204,7 @@ export async function openReceiveAll(sjItem, onDone) {
 
   const dateInput = el('input', { type: 'date', value: state.serverDate || '', required: true });
   const rackSelect = select(
-    racks.map((r) => ({ value: r.id, label: `${r.code} — ${r.name}` })),
+    racks.map((r) => ({ value: r.id, label: String(r.code || '—') })),
     racks[0] ? racks[0].id : ''
   );
   const kondisiSelect = select(state.constants.kondisi || ['Baik', 'Rusak sebagian'], 'Baik');

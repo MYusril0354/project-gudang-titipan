@@ -67,14 +67,13 @@ const ENTITIES = {
   },
   rack: {
     label: 'Rak',
+    // Rak cukup dikenali dari kodenya; kolom "Nama" tidak dipakai lagi.
     cols: [
       { key: 'code', label: 'Kode' },
-      { key: 'name', label: 'Nama' },
       { key: 'locationName', label: 'Gudang' }
     ],
     formFields: [
       { key: 'code', label: 'Kode', required: true, placeholder: 'mis. F-01-01' },
-      { key: 'name', label: 'Nama', required: true },
       { key: 'locationId', label: 'Gudang', type: 'select', required: true,
         options: () => state.master.locations.map((l) => ({ value: l.id, label: `${l.type} — ${l.name}` })) }
     ],

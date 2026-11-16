@@ -12,7 +12,7 @@ Kolom `id` diisi server. Semua tabel punya `created_at`, `created_by`, `updated_
 | `products` | id, code (unik), name, unit (**teks bebas**, maks 20 karakter) |
 | `customers` | id, code (unik), name, address, phone |
 | `locations` | id, type (MAIN/CONSIGN), name, customer_id |
-| `racks` | id, code (unik), name, location_id |
+| `racks` | id, code (unik), name (kolom lama, tidak dipakai UI), location_id |
 | `sj` | no (unik), date, customer_id, po, status_cache |
 | `sj_lines` | id, sj_no, product_id, qty_sj, qty_cancelled, decision (OPEN/WAITING/DONE), alasan, eta, pic, **planned_batch**, **planned_ed** |
 | `receipts` | id, sj_line_id, qty, rack_id, date, pic, batch_number, kondisi, **ed** |
