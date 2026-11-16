@@ -284,11 +284,12 @@ belakang dengan indikator **"Memperbarui…"**.
 | --- | --- | --- |
 | Kunjungan pertama sebuah halaman | ~3,2 dtk | ~3,2 dtk (tidak berubah) |
 | **Kunjungan berikutnya / pindah-pindah halaman** | ~3,2 dtk | **~0,001 dtk** |
+| **Pindah ke halaman tak terkait setelah simpan** (dulu cache dibuang semua) | ~2 dtk (ambil ulang dari server) | **~0,01–0,02 dtk** (terukur 10–22 ms di uji browser) |
 
 Cara kerjanya:
 
 - Cache dipisah **per pengguna**; berganti akun → cache dibuang.
-- Setiap aksi **tulis** membuang seluruh cache, lalu halaman memuat data segar.
+- Setiap aksi **tulis** hanya membuang cache yang **terdampak** (mis. simpan master tidak menghapus cache daftar pengiriman), jadi halaman lain tetap tampil seketika. Pemetaannya ada di `frontend/js/api.js` (`WRITE_INVALIDATES`); aksi `system.*` dan `auth.*` tetap membersihkan semuanya.
 - Indikator "Memperbarui…" muncul selama penyegaran latar berjalan.
 - Halaman dirender ulang otomatis bila isi data berubah — **kecuali** sedang ada
   modal terbuka atau pengguna sedang mengetik (agar fokus tidak hilang).
@@ -298,7 +299,7 @@ Cara kerjanya:
   `{ fresh: true }` sehingga **tidak** memakai cache.
 
 **Bila data terlihat tidak sesuai:** tunggu beberapa detik (penyegaran latar
-berjalan otomatis), atau buka DevTools → `localStorage.removeItem('gt_cache_v1')`
+berjalan otomatis), atau buka DevTools → `localStorage.removeItem('gt_cache_v2')`
 lalu muat ulang. Verifikasi kebenaran tetap dari **Rekonsiliasi** (`variance`).
 
 **Bila target 300 ms tetap wajib:** hanya bisa dicapai dengan memindahkan API
@@ -322,7 +323,7 @@ atau D1). Kontrak API tidak perlu berubah — hanya lapisan `Db.gs` yang diganti
 | Gejala | Kemungkinan penyebab | Tindakan |
 | --- | --- | --- |
 | Semua halaman menampilkan "Gagal menghubungi server" | deployment belum dipindah ke versi baru, atau URL `/exec` berubah | cek `system.health`, pindahkan deployment ke versi terbaru |
-| Data terlihat tidak sesuai / tertinggal | salinan cache browser | tunggu beberapa detik (penyegaran latar otomatis), atau hapus `localStorage` kunci `gt_cache_v1` lalu muat ulang |
+| Data terlihat tidak sesuai / tertinggal | salinan cache browser | tunggu beberapa detik (penyegaran latar otomatis), atau hapus `localStorage` kunci `gt_cache_v2` lalu muat ulang |
 | Halaman pertama kali dibuka terasa lambat | belum ada salinan cache | wajar (~3 dtk); kunjungan berikutnya instan |
 | Login gagal padahal password benar | akun terkunci setelah 5x gagal | tunggu 10 menit, atau ADMIN reset password |
 | `FORBIDDEN` pada action tertentu | `PROD_LOCK` aktif | cek `system.hardening`, buka kunci bila memang perlu |

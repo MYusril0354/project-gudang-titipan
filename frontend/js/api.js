@@ -9,7 +9,7 @@
  */
 
 import { CONFIG } from './config.js';
-import { cacheRead, cacheSet, clearAll, markRefresh } from './cache.js';
+import { cacheRead, cacheSet, clearAll, clearFamilies, markRefresh } from './cache.js';
 
 const TOKEN_KEY = 'gt_token';
 
@@ -45,11 +45,39 @@ export function clearSession() {
 const AUTH_ERRORS = ['UNAUTHENTICATED'];
 
 /**
+ * Keluarga cache yang harus dibuang setelah satu aksi TULIS.
+ *
+ * Kunci = awalan action tulis (sebelum titik), nilai = keluarga cache yang
+ * mungkin berubah karenanya. `audit` selalu ikut karena setiap tulis menambah
+ * baris audit. Family yang tidak terdaftar (mis. `system`, `auth`) dibersihkan
+ * seluruhnya — sikap aman untuk aksi yang cakupannya luas.
+ *
+ * Bila ragu menambah entri baru: masukkan semua keluarga yang menampilkan data
+ * terkait. Salah menyertakan hanya membuat satu halaman mengambil ulang dari
+ * server; salah melewatkan membuat data basi sampai TTL cache habis.
+ */
+const WRITE_INVALIDATES = {
+  master: ['master', 'system', 'audit'],
+  sj: ['sj', 'pending', 'dashboard', 'stock', 'ledger', 'report', 'audit'],
+  shipment: ['shipment', 'sj', 'stock', 'pending', 'dashboard', 'ledger', 'report', 'audit'],
+  user: ['user', 'audit']
+};
+
+/** Buang cache yang terdampak satu aksi tulis. */
+function invalidateAfterWrite(action) {
+  const family = String(action).split('.')[0];
+  const affected = WRITE_INVALIDATES[family];
+  if (affected) clearFamilies(affected);
+  else clearAll();
+}
+
+/**
  * Panggil satu action API.
  *
  * Untuk aksi BACA, salinan cache dikembalikan seketika lalu disegarkan di
  * belakang (stale-while-revalidate) sehingga pindah halaman terasa instan.
- * Aksi TULIS selalu ke server dan membuang seluruh cache.
+ * Aksi TULIS selalu ke server dan membuang cache yang terdampak saja
+ * (lihat `WRITE_INVALIDATES`).
  *
  * @param {string} action  mis. 'sj.create'
  * @param {object} [params]
@@ -75,7 +103,7 @@ export async function api(action, params = {}, opts = {}) {
 
   try {
     const data = await request(action, params, opts);
-    if (opts.write) clearAll();          // data transaksi berubah -> buang cache
+    if (opts.write) invalidateAfterWrite(action); // buang cache yang terdampak saja
     else if (cacheable) cacheSet(action, params, data);
     return data;
   } catch (err) {

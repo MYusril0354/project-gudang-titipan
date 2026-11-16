@@ -9,12 +9,14 @@
  *
  * Keamanan & kebenaran:
  *  - Cache dipisah per pengguna; berganti pengguna -> cache dibuang.
- *  - Setiap aksi TULIS membuang seluruh cache (server tetap sumber kebenaran).
+ *  - Aksi TULIS membuang cache yang TERDAMPAK saja (`clearFamilies`), bukan
+ *    seluruh cache; server tetap sumber kebenaran dan aksi tulis selalu ke
+ *    server. Pemetaan dampaknya ada di `api.js` (`WRITE_INVALIDATES`).
  *  - Aksi yang butuh data pasti (mis. batch tersedia untuk form pengiriman)
  *    boleh memakai `{ fresh: true }` agar tidak memakai cache.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const STORAGE_KEY = 'gt_cache_' + VERSION;
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 const MAX_BYTES = 2000000;
@@ -141,6 +143,42 @@ export function clearAll() {
   const store = loadStore();
   delete store[scope];
   saveStore();
+}
+
+/**
+ * Buang cache hanya untuk "keluarga" action tertentu.
+ *
+ * Satu aksi tulis biasanya hanya mengubah sebagian data (mis. tambah rak tidak
+ * mengubah daftar pengiriman). Dulu semua cache dibuang, sehingga setiap
+ * penyimpanan memaksa semua halaman mengambil ulang dari server (±2 dtk per
+ * halaman). Sekarang hanya keluarga yang terdampak yang dibuang.
+ *
+ * Pemanggil WAJIB menyertakan semua keluarga yang mungkin terpengaruh; bila
+ * ragu, pakai `clearAll()`. Kunci cache berbentuk `action|params`, jadi
+ * keluarga = bagian sebelum titik (mis. `master.list|{}` -> `master`).
+ *
+ * @param {string[]} families daftar keluarga action yang dibuang
+ * @returns {number} jumlah entri yang dibuang
+ */
+export function clearFamilies(families) {
+  const want = Array.isArray(families) ? families : [];
+  if (!want.length) { clearAll(); return 0; }
+
+  const store = loadStore();
+  const bucket = store[scope];
+  if (!bucket) return 0;
+
+  let removed = 0;
+  for (const key of Object.keys(bucket)) {
+    const action = String(key).split('|')[0];
+    const family = action.split('.')[0];
+    if (want.indexOf(family) !== -1) {
+      delete bucket[key];
+      removed++;
+    }
+  }
+  saveStore();
+  return removed;
 }
 
 /** Buang seluruh cache (semua pengguna) — dipakai saat logout. */
