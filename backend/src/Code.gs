@@ -40,6 +40,7 @@ var ROUTES = {
 
   /* --- master data: baca semua, tulis ADMIN --- */
   'master.list': { fn: masterList_, roles: null, write: false },
+  'master.listAll': { fn: masterListAll_, roles: null, write: false },
   'master.create': { fn: masterCreate_, roles: [ROLES.ADMIN], write: true },
   'master.update': { fn: masterUpdate_, roles: [ROLES.ADMIN], write: true },
   'master.delete': { fn: masterDelete_, roles: [ROLES.ADMIN], write: true },
@@ -83,6 +84,42 @@ var ROUTES = {
 };
 
 /* =========================================================
+   CACHE BACA (optimasi kinerja P2)
+   ---------------------------------------------------------
+   Hanya untuk respons yang TIDAK memuat data pribadi pengguna (aman dipakai
+   bersama). Kunci cache memuat "versi data" yang dinaikkan setiap aksi tulis,
+   jadi hasil baca tidak pernah basi setelah simpan/hapus.
+   ========================================================= */
+
+/** Aksi baca yang boleh memakai cache bersama: action -> umur (detik). */
+var READ_CACHE_TTL_ = {
+  'master.list': 120,
+  'master.listAll': 120,
+  'dashboard.summary': 30,
+  'stock.list': 30,
+  'pending.list': 30,
+  'sj.list': 30,
+  'sj.get': 30,
+  'shipment.list': 30,
+  'ledger.kartuStock': 30,
+  'report.reconciliation': 60
+};
+
+/** Jalankan aksi baca lewat cache bila action-nya terdaftar. */
+function readCached_(action, params, compute) {
+  var ttl = READ_CACHE_TTL_[String(action)];
+  if (!ttl) return compute();
+
+  var key;
+  try {
+    key = action + '|' + JSON.stringify(params || {});
+  } catch (ignore) {
+    return compute(); // parameter tidak bisa diserialisasi -> lewati cache
+  }
+  return cachedRead_(key, ttl, compute);
+}
+
+/* =========================================================
    ENTRY POINT
    ========================================================= */
 
@@ -114,14 +151,17 @@ function doPost(e) {
     if (handler.write) {
       data = withLock_(function () {
         try {
-          return idempotent_(req.requestId, function () { return handler.fn(params, ctx); });
+          var result = idempotent_(req.requestId, function () { return handler.fn(params, ctx); });
+          // Versi data naik -> seluruh cache baca lama tidak terpakai lagi.
+          bumpDataVersion_();
+          return result;
         } finally {
           // Audit ditulis sekali per request, di dalam lock (anti baris bertabrakan).
           flushAudit_();
         }
       });
     } else {
-      data = handler.fn(params, ctx);
+      data = readCached_(req.action, params, function () { return handler.fn(params, ctx); });
     }
 
     res = { ok: true, data: data, meta: { serverTime: nowIso_() } };

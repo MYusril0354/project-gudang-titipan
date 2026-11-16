@@ -221,6 +221,22 @@ function masterList_(params, ctx) {
   return { entity: params.entity, items: sortMaster_(items), total: items.length };
 }
 
+/**
+ * Baca SEMUA master data dalam satu request.
+ *
+ * Dipakai halaman Master setelah simpan/hapus: sebelumnya frontend memanggil
+ * `master.list` empat kali (4 round-trip ±3 dtk), sekarang satu.
+ * Isinya sama dengan bagian master pada `system.bootstrap`.
+ */
+function masterListAll_(params, ctx) {
+  return {
+    products: sortMaster_(readMaster_('product')),
+    customers: sortMaster_(readMaster_('customer')),
+    locations: sortMaster_(readMaster_('location')),
+    racks: sortMaster_(readMaster_('rack'))
+  };
+}
+
 /** Tambah data master. */
 function masterCreate_(params, ctx) {
   var entity = params.entity;

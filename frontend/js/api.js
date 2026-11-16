@@ -179,6 +179,8 @@ export const dashboard = {
 
 export const master = {
   list: (entity, filter) => api('master.list', { entity, ...filter }),
+  // Semua master sekaligus (produk, pelanggan, gudang, rak) dalam satu request.
+  listAll: () => api('master.listAll'),
   create: (entity, values) => api('master.create', { entity, values }, { write: true }),
   update: (entity, id, values) => api('master.update', { entity, id, values }, { write: true }),
   remove: (entity, id) => api('master.delete', { entity, id }, { write: true }),

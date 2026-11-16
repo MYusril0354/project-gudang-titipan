@@ -469,18 +469,14 @@ function openForm(item) {
    ========================================================= */
 
 async function refreshAfterMutation() {
-  // muat ulang master data agar state lokal sinkron (PRD 12.3)
+  // Muat ulang master data agar state lokal sinkron (PRD 12.3).
+  // Satu request `master.listAll` menggantikan empat panggilan `master.list`.
   try {
-    const b = await Promise.all([
-      master.list('product'),
-      master.list('customer'),
-      master.list('location'),
-      master.list('rack')
-    ]);
-    setMaster('product', b[0].items);
-    setMaster('customer', b[1].items);
-    setMaster('location', b[2].items);
-    setMaster('rack', b[3].items);
+    const b = await master.listAll();
+    setMaster('product', b.products || []);
+    setMaster('customer', b.customers || []);
+    setMaster('location', b.locations || []);
+    setMaster('rack', b.racks || []);
     notify();
   } catch (ignore) { /* halaman tetap bisa render dari server */ }
   await load(activeTab);

@@ -128,8 +128,8 @@ function invalidateReadCache_(table) {
 /** Tabel yang isinya jarang berubah. */
 var MASTER_TABLES_ = ['products', 'customers', 'locations', 'racks'];
 
-/** Umur cache master (detik). */
-var MASTER_CACHE_TTL_ = 300;
+/** Umur cache master (detik) — data master hampir tidak pernah berubah. */
+var MASTER_CACHE_TTL_ = 900;
 
 /** Batas ukuran JSON yang boleh di-cache (byte) — sisakan ruang dari 100KB. */
 var MASTER_CACHE_MAX_ = 90000;
@@ -187,6 +187,84 @@ function dropMasterCache_(name) {
   } catch (ignore) {
     // kegagalan cache tidak boleh menggagalkan aksi utama
   }
+}
+
+/* =========================================================
+   VERSI DATA + CACHE BACA (optimasi kinerja P2)
+   ---------------------------------------------------------
+   Setiap aksi TULIS menaikkan "versi data" di CacheService. Kunci cache
+   baca memuat versi itu, sehingga hasil baca lama otomatis tidak terpakai
+   begitu ada perubahan — tidak ada data basi setelah simpan/hapus.
+
+   Race yang tetap aman: request baca yang MULAI sebelum penulisan selesai
+   menyimpan hasilnya dengan versi lama. Versi lama sudah tidak dibaca lagi,
+   jadi hasil itu tidak pernah disajikan setelah data berubah.
+   ========================================================= */
+
+/** Kunci versi data. */
+var DATA_VERSION_KEY_ = 'gt_data_version_v1';
+
+/** TTL versi (detik) — cukup panjang; nilai hanya naik. */
+var DATA_VERSION_TTL_SEC_ = 21600;
+
+/** Versi data saat ini (string angka). */
+function getDataVersion_() {
+  var cache = scriptCache_();
+  if (!cache) return '0';
+  try {
+    return cache.get(DATA_VERSION_KEY_) || '0';
+  } catch (ignore) {
+    return '0';
+  }
+}
+
+/** Naikkan versi data: semua cache baca lama tidak terpakai lagi. */
+function bumpDataVersion_() {
+  var cache = scriptCache_();
+  if (!cache) return false;
+  try {
+    cache.put(DATA_VERSION_KEY_, String(Number(getDataVersion_() || 0) + 1), DATA_VERSION_TTL_SEC_);
+    return true;
+  } catch (ignore) {
+    return false;
+  }
+}
+
+/** Batas ukuran satu entri cache (karakter) — sisakan ruang dari 100KB. */
+var READ_CACHE_MAX_CHARS_ = 90000;
+
+/**
+ * Baca dari cache bersama, atau hitung lalu simpan.
+ *
+ * Aman dipakai bersama semua pengguna HANYA untuk respons yang tidak memuat
+ * data pribadi pengguna. Kunci selalu memuat versi data, jadi penulisan apa
+ * pun langsung membatalkan isi cache.
+ *
+ * @param {string} key kunci logis (sudah memuat parameter)
+ * @param {number} ttlSec umur cache
+ * @param {Function} compute fungsi yang menghasilkan nilai
+ * @returns {*} nilai hasil
+ */
+function cachedRead_(key, ttlSec, compute) {
+  var cache = scriptCache_();
+  if (!cache) return compute();
+
+  var fullKey = 'gt_r_' + getDataVersion_() + '_' + String(key).slice(0, 180);
+  try {
+    var raw = cache.get(fullKey);
+    if (raw) return JSON.parse(raw);
+  } catch (ignore) { /* cache rusak -> hitung ulang */ }
+
+  var result = compute();
+
+  try {
+    var json = JSON.stringify(result);
+    if (json && json.length <= READ_CACHE_MAX_CHARS_) {
+      cache.put(fullKey, json, Math.max(1, Number(ttlSec) || 30));
+    }
+  } catch (ignore) { /* kegagalan cache tidak boleh menggagalkan request */ }
+
+  return result;
 }
 
 /** Workbook database aktif (di-cache per request). */

@@ -28,6 +28,12 @@ var AUTH_EPOCH_KEY_ = 'gt_auth_epoch_v1';
 /** TTL epoch (detik) — cukup lama; entri sesi sendiri hanya 60 detik. */
 var AUTH_EPOCH_TTL_SEC_ = 21600;
 
+/** Jeda minimum antar-pembersihan sesi kedaluwarsa (detik). */
+var SESSION_PRUNE_INTERVAL_SEC_ = 3600;
+
+/** Maksimum sesi kedaluwarsa yang dibuang per pembersihan. */
+var SESSION_PRUNE_MAX_ = 50;
+
 /** Maksimum percobaan login gagal sebelum dikunci. */
 var MAX_FAILED_LOGIN = 5;
 
@@ -187,6 +193,36 @@ function loadSession_(token) {
   return ctx;
 }
 
+/**
+ * Buang sesi yang sudah kedaluwarsa.
+ *
+ * Sebelumnya baris sesi hanya terhapus bila token itu dipakai lagi, sehingga
+ * tabel `sessions` tumbuh terus dan dibaca penuh pada setiap request. Fungsi
+ * ini dijalankan dari `auth.login` maksimal sekali per jam (penanda di cache)
+ * dan dibatasi beberapa baris per putaran agar tidak menjadi beban baru.
+ *
+ * @returns {number} jumlah sesi yang dibuang
+ */
+function pruneExpiredSessions_() {
+  var cache = scriptCache_();
+  var flagKey = 'gt_sess_prune_v1';
+  if (cache) {
+    try {
+      if (cache.get(flagKey)) return 0;
+      cache.put(flagKey, '1', SESSION_PRUNE_INTERVAL_SEC_);
+    } catch (ignore) { /* lanjut saja; pruning bersifat pemeliharaan */ }
+  }
+
+  var now = nowStamp_();
+  var removed = 0;
+  readTable_('sessions').forEach(function (s) {
+    if (removed >= SESSION_PRUNE_MAX_) return;
+    if (!s.token) return;
+    if (String(s.expires_at) <= now && deleteById_('sessions', s.token)) removed++;
+  });
+  return removed;
+}
+
 /** Buat token sesi baru dan simpan. */
 function createSession_(userId) {
   var token = Utilities.getUuid().replace(/-/g, '');
@@ -245,11 +281,13 @@ function authLogin_(params) {
     throw apiError_('UNAUTHENTICATED', 'Username atau password salah.');
   }
 
-  // Berhasil: reset penghitung gagal, buat sesi.
+  // Berhasil: reset penghitung gagal, buang sesi kedaluwarsa (maks sekali/jam),
+  // lalu buat sesi baru.
   if (Number(user.failed_count || 0) > 0 || user.locked_until) {
     updateById_('users', user.id, { failed_count: 0, locked_until: '' });
   }
 
+  pruneExpiredSessions_();
   var token = createSession_(user.id);
   auditRaw_(username, 'auth.login', 'user', user.id, 'Login berhasil');
 

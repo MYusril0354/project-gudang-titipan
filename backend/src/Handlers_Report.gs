@@ -317,15 +317,24 @@ var ALASAN_ = {
 /** Satuan yang SERING dipakai — hanya saran untuk UI, bukan batasan (satuan bebas). */
 var SATUAN_UMUM_ = ['pcs', 'rim', 'pak', 'box', 'lusin', 'unit', 'kg', 'liter', 'dus', 'bal', 'roll', 'meter'];
 
-/** Info kop surat — dibaca dari Script Properties agar bisa diubah tanpa deploy. */
+/**
+ * Info kop surat — dibaca dari Script Properties agar bisa diubah tanpa deploy.
+ *
+ * Semula 6 kali `getProperty` setiap panggilan (dipakai bootstrap & cetak
+ * pengiriman). Sekarang hasilnya di-cache di CacheService; kunci memuat versi
+ * data sehingga setiap aksi tulis (termasuk `system.setup` yang menyemai nilai
+ * awal) otomatis membuat entri lama tidak terpakai.
+ */
 function getCompany_() {
-  var p = PropertiesService.getScriptProperties();
-  return {
-    name: p.getProperty('COMPANY_NAME') || 'PT DISTRIBUSI NUSANTARA',
-    address: p.getProperty('COMPANY_ADDRESS') || '',
-    phone: p.getProperty('COMPANY_PHONE') || '',
-    email: p.getProperty('COMPANY_EMAIL') || '',
-    npwp: p.getProperty('COMPANY_NPWP') || '',
-    logo: p.getProperty('COMPANY_LOGO') || 'DN'
-  };
+  return cachedRead_('company.info', 900, function () {
+    var p = PropertiesService.getScriptProperties();
+    return {
+      name: p.getProperty('COMPANY_NAME') || 'PT DISTRIBUSI NUSANTARA',
+      address: p.getProperty('COMPANY_ADDRESS') || '',
+      phone: p.getProperty('COMPANY_PHONE') || '',
+      email: p.getProperty('COMPANY_EMAIL') || '',
+      npwp: p.getProperty('COMPANY_NPWP') || '',
+      logo: p.getProperty('COMPANY_LOGO') || 'DN'
+    };
+  });
 }

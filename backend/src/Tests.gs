@@ -187,6 +187,32 @@ function systemSelfTest_(params, ctx) {
     });
   }
 
+  /* ---------- MASTER.listAll & CACHE BACA ---------- */
+  check('master.listAll: mengembalikan 4 daftar master', true, function () {
+    var all = masterListAll_({}, admin);
+    ['products', 'customers', 'locations', 'racks'].forEach(function (k) {
+      if (!all[k] || typeof all[k].length !== 'number') throw new Error('bagian ' + k + ' tidak ada');
+    });
+    if (bulkRacks.length && !all.racks.some(function (r) { return String(r.id) === String(bulkRacks[0]); })) {
+      throw new Error('rak uji tidak ditemukan di master.listAll');
+    }
+    return true;
+  });
+
+  check('cache baca: versi data naik -> entri lama tidak terpakai', true, function () {
+    var v1 = getDataVersion_();
+    var first = cachedRead_('uji.cache', 60, function () { return { hit: v1 }; });
+    if (first.hit !== v1) throw new Error('nilai pertama salah');
+
+    var second = cachedRead_('uji.cache', 60, function () { return { hit: 'dihitung-ulang' }; });
+    if (second.hit !== v1) throw new Error('cache tidak dipakai pada pembacaan kedua');
+
+    bumpDataVersion_();
+    var third = cachedRead_('uji.cache', 60, function () { return { hit: 'setelah-tulis' }; });
+    if (third.hit !== 'setelah-tulis') throw new Error('entri lama masih dipakai setelah versi naik');
+    return true;
+  });
+
   /* ---------- ENTITY TIDAK DIKENAL ---------- */
   check('entity tidak dikenal ditolak', 'VALIDATION_ERROR', function () {
     return masterList_({ entity: 'supplier' }, admin);

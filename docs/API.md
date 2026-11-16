@@ -79,6 +79,7 @@ Satu-satunya action yang juga menerima `GET`: `GET {GAS_EXEC_URL}?action=system.
 | `system.bootstrap` | semua | – | Master data + konstanta + tanggal server + info perusahaan |
 | `dashboard.summary` | semua | – | Angka 4 kartu, top pending, stok per pelanggan |
 | `master.list` | semua | – | Baca master; param `entity`: product, customer, location, rack |
+| `master.listAll` | semua | – | Semua master sekaligus (`products`, `customers`, `locations`, `racks`) dalam satu request |
 | `master.create` / `master.update` / `master.delete` | ADMIN | ✓ | CRUD master (aturan PRD 6.8) |
 | `sj.list` / `sj.get` | semua | – | Daftar / detail SJ |
 | `sj.nextNumber` | ADMIN, GUDANG | – | Saran nomor SJ berikutnya |

@@ -169,6 +169,48 @@ Sementara ini, pantau lewat tab Error Log.
 
 ## 8. Risiko & batasan yang diketahui
 
+### Kinerja — optimasi P2 (diukur 2026-11-16, p50, n=8–12 per endpoint)
+
+Kelanjutan P1, tetap tanpa mengubah kontrak API:
+
+5. **Cache baca bersama berbasis "versi data"** (`cachedRead_`). Setiap aksi
+   tulis menaikkan versi di `CacheService`; kunci cache memuat versi itu,
+   sehingga hasil baca lama **tidak mungkin** tersaji setelah ada perubahan.
+   Bila ada request baca yang mulai sebelum penulisan selesai, hasilnya
+   tersimpan dengan versi lama yang sudah tidak dibaca lagi — jadi tidak ada
+   data basi. Yang di-cache: `dashboard.summary`, `stock.list`, `pending.list`,
+   `sj.list`, `sj.get`, `shipment.list`, `master.list`, `master.listAll`,
+   `ledger.kartuStock`, `report.reconciliation` (TTL 30–120 dtk).
+   Hanya endpoint yang **tidak** memuat data pribadi pengguna yang di-cache.
+6. **`master.listAll`** — satu request untuk produk+pelanggan+gudang+rak.
+   Halaman Master memakainya setelah simpan/hapus (dulu 4 panggilan ±3 dtk
+   masing-masing).
+7. **Pembersihan sesi kedaluwarsa** dijalankan dari `auth.login` maksimal
+   sekali per jam (≤50 baris per putaran), supaya tabel `sessions` tidak
+   tumbuh selamanya dan biaya baca tidak naik seiring waktu.
+8. **Cache master 5 → 15 menit** dan **cache kop surat** (`getCompany_`,
+   sebelumnya 6 kali `getProperty` per panggilan).
+
+| Endpoint | p50 setelah P1 | p50 setelah P2 | Perubahan |
+| --- | --- | --- | --- |
+| `system.health` (tanpa sheet) | 1,65 dtk | 1,70 dtk | — lantai platform |
+| `system.bootstrap` | 2,05 dtk | 2,01 dtk | — (tidak di-cache: memuat profil pengguna) |
+| `master.list` rack | 2,03 dtk | 1,80 dtk | −11% |
+| `master.list` product | 1,85 dtk | 1,81 dtk | — |
+| `stock.list` | 4,28 dtk | **1,95 dtk** | **−54%** |
+| `dashboard.summary` | 3,99 dtk | **1,86 dtk** | **−53%** |
+| `sj.list` | 3,69 dtk | **1,96 dtk** | **−47%** |
+| `pending.list` | 3,42 dtk | **1,91 dtk** | **−44%** |
+
+Sekarang hampir semua endpoint baca berada di **lantai platform** (~1,6–2,0 dtk):
+yang tersisa hanyalah biaya masuk ke Apps Script. Permintaan pertama per versi
+data (mis. langsung setelah simpan) tetap ±3,5–4,5 dtk karena harus membaca
+sheet.
+
+Kebenaran data dijaga uji di `system.selfTest`: 26/26 lulus, termasuk uji
+"versi data naik → entri cache lama tidak terpakai" dan bentuk balasan
+`master.listAll`.
+
 ### Kinerja — optimasi P1 (diukur 2026-11-16, p50, n=8–12 per endpoint)
 
 Empat perubahan yang tidak mengubah kontrak API maupun aturan keamanan:
