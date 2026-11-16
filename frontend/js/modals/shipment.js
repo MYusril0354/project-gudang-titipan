@@ -37,21 +37,22 @@ export async function openCreateShipment(onDone) {
 
   const draft = {
     date: state.serverDate || '',
-    customerId: state.master.customers[0].id,
+    customerId: '',
     ekspedisi: '',
     note: '',
     lines: []
   };
 
   let batches = [];
-  let loadingBatches = true;
-  /** Penjaga agar pemilihan pelanggan otomatis hanya dicoba sekali. */
-  let autoPicked = false;
+  let loadingBatches = false;
 
   const dateInput = el('input', { type: 'date', value: draft.date, required: true });
   const customerSelect = select(
-    state.master.customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` })),
-    draft.customerId
+    [
+      { value: '', label: '— Pilih pelanggan terlebih dahulu —' },
+      ...state.master.customers.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` }))
+    ],
+    ''
   );
   // Satu kolom "Ekspedisi" menggantikan Sopir + Kendaraan (muncul di cetak).
   const ekspedisiInput = el('input', { type: 'text', placeholder: 'Nama ekspedisi / pengangkutan' });
@@ -59,8 +60,8 @@ export async function openCreateShipment(onDone) {
   const linesWrap = el('div');
   const summary = el('div', { class: 'hint' });
 
-  const submitBtn = btn('Simpan Pengiriman', { variant: 'primary' });
-  const savePrintBtn = btn('Simpan & Cetak', { variant: 'ok' });
+  const submitBtn = btn('Simpan Pengiriman', { variant: 'primary', disabled: true });
+  const savePrintBtn = btn('Simpan & Cetak', { variant: 'ok', disabled: true });
 
   const dlg = modal({
     title: 'Buat Pengiriman',
@@ -89,8 +90,23 @@ export async function openCreateShipment(onDone) {
     ]
   });
 
+  /** Kembalikan form ke kondisi menunggu pemilihan pelanggan. */
+  function resetLinesWaiting(msg) {
+    batches = [];
+    draft.lines = [];
+    linesWrap.innerHTML = '';
+    linesWrap.appendChild(callout(msg || 'Pilih pelanggan terlebih dahulu untuk memuat batch tersedia.', 'amber'));
+    summary.textContent = '';
+    submitBtn.disabled = true;
+    savePrintBtn.disabled = true;
+  }
+
   /** Muat batch tersedia untuk pelanggan terpilih. */
   async function loadBatches() {
+    if (!customerSelect.value) {
+      resetLinesWaiting();
+      return;
+    }
     loadingBatches = true;
     linesWrap.innerHTML = '';
     linesWrap.appendChild(el('div', { class: 'hint', text: 'Memuat batch tersedia…' }));
@@ -104,55 +120,14 @@ export async function openCreateShipment(onDone) {
     }
     loadingBatches = false;
 
-    // Pelanggan terpilih belum punya stok: coba pilih pelanggan lain yang punya,
-    // supaya form tidak langsung tampak kosong. Hanya dicoba sekali.
-    if (!batches.length && !autoPicked) {
-      const moved = await pickCustomerWithStock();
-      if (moved) return;
-    }
-
     if (!batches.length) {
-      draft.lines = [];
-      linesWrap.innerHTML = '';
-      linesWrap.appendChild(callout(
-        'Tidak ada batch tersedia untuk pelanggan ini. Pastikan penerimaan fisik sudah dikonfirmasi.',
-        'amber'
-      ));
-      submitBtn.disabled = true;
-      savePrintBtn.disabled = true;
-      summary.textContent = '';
+      resetLinesWaiting('Tidak ada batch tersedia untuk pelanggan ini. Pastikan penerimaan fisik sudah dikonfirmasi.');
       return;
     }
     submitBtn.disabled = false;
     savePrintBtn.disabled = false;
     draft.lines = [{ receiptId: batches[0].id, qty: 1, colly: 0 }];
     renderLines();
-  }
-
-  /**
-   * Pilih otomatis pelanggan pertama yang masih punya stok.
-   * Memakai `stock.list()` (satu panggilan) yang sudah memuat ringkasan per
-   * pelanggan, bukan menanyakan satu per satu.
-   * @returns {Promise<boolean>} true bila pelanggan diganti (pemanggil berhenti)
-   */
-  async function pickCustomerWithStock() {
-    autoPicked = true;
-    try {
-      const res = await stock.list({});
-      const withStock = (res.perCustomer || []).filter((c) => c.qty > 0);
-      if (!withStock.length) return false;
-
-      const current = String(customerSelect.value);
-      const target = withStock.find((c) => String(c.customerId) === current) || withStock[0];
-      if (!target || String(target.customerId) === current) return false;
-
-      customerSelect.value = target.customerId;
-      draft.customerId = target.customerId;
-      await loadBatches();
-      return true;
-    } catch (ignore) {
-      return false;
-    }
   }
 
   /** Render baris: batch + qty + colly (koli) + sisa. */
@@ -232,11 +207,18 @@ export async function openCreateShipment(onDone) {
     summary.style.color = over ? 'var(--red)' : '';
   }
 
-  customerSelect.addEventListener('change', loadBatches);
-  await loadBatches();
+  customerSelect.addEventListener('change', () => {
+    draft.customerId = customerSelect.value;
+    loadBatches();
+  });
+  resetLinesWaiting();
 
   /** Simpan; cetak bila diminta. */
   async function save(andPrint) {
+    if (!customerSelect.value) {
+      toast('Pilih pelanggan terlebih dahulu.', 'err');
+      return;
+    }
     if (!dateInput.value) {
       dateInput.classList.add('input-invalid');
       toast('Tanggal kirim wajib diisi.', 'err');
