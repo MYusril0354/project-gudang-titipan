@@ -14,10 +14,11 @@ import { sj } from '../api.js';
 import { state, fmt, fmtDate, STATUS_META } from '../state.js';
 import {
   el, btn, badge, panel, callout, emptyBox, skeleton, errorBox,
-  searchInput, toast, sub, kodeTag, rakTag, batchTag, progressBar
+  searchInput, toast, sub, kodeTag, rakTag, batchTag, progressBar, confirmDialog
 } from '../ui.js';import { openCreateSJ } from '../modals/sj-create.js';
 import { openReceive, openReceiveAll, openWait, openCancel } from '../modals/sj.js';
 import { openImportCsv } from '../modals/import.js';
+import { openAtenaImport } from '../modals/atena-import.js';
 
 /**
  * Render halaman. Dipanggil main.js pada setiap navigasi.
@@ -43,6 +44,16 @@ export async function renderPenerimaanPage(view) {
         filter.q = v;
         state.filters.penerimaan = v;
         load();
+      }),
+      btn('Impor dari Atena', {
+        title: 'Tarik DN dari ERP Atena lalu jadikan Surat Jalan',
+        onClick: () => {
+          if (!state.master.customers.length || !state.master.products.length) {
+            toast('Lengkapi Master Data (pelanggan & produk) terlebih dahulu.', 'err');
+            return;
+          }
+          openAtenaImport(load);
+        }
       }),
       btn('Impor CSV', {
         title: 'Impor banyak Surat Jalan dari satu berkas CSV',
@@ -116,6 +127,7 @@ function buildCard(item) {
     ]),
     el('div', { class: 'head-right' }, [
       buildReceiveAllButton(item),
+      buildDeleteButton(item),
       badge(meta.label, meta.cls)
     ])
   ]);
@@ -159,6 +171,38 @@ function buildReceiveAllButton(sjItem) {
     variant: 'ok',
     title: 'Terima semua produk pada Surat Jalan ini sekaligus',
     onClick: () => openReceiveAll(sjItem, reload)
+  });
+}
+
+/**
+ * Tombol Hapus SJ — hanya ADMIN dan hanya bila belum ada penerimaan fisik.
+ * Berguna membatalkan salah impor (mis. impor DN dari Atena).
+ * Server tetap memeriksa ulang; SJ yang sudah menerima stok akan ditolak.
+ */
+function buildDeleteButton(sjItem) {
+  const isAdmin = state.user && state.user.role === 'ADMIN';
+  if (!isAdmin || !sjItem.canDelete) return el('span');
+
+  return btn('Hapus', {
+    variant: 'danger',
+    title: 'Hapus SJ yang belum pernah menerima stok',
+    onClick: () => confirmDialog({
+      title: 'Hapus Surat Jalan?',
+      message: `Hapus ${sjItem.no} beserta ${sjItem.totalLines} barisnya? `
+        + 'Tindakan ini tidak bisa dibatalkan. SJ yang sudah punya penerimaan fisik akan ditolak server.',
+      confirmText: 'Hapus',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await sj.remove(sjItem.no);
+          toast(`${sjItem.no} dihapus.`, 'ok');
+          const page = document.querySelector('#view');
+          if (page) renderPenerimaanPage(page);
+        } catch (err) {
+          toast(err.message || 'Gagal menghapus SJ', 'err');
+        }
+      }
+    })
   });
 }
 

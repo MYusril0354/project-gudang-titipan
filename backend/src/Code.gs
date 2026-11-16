@@ -51,6 +51,7 @@ var ROUTES = {
   'sj.get': { fn: sjGet_, roles: null, write: false },
   'sj.nextNumber': { fn: sjNextNumber_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: false },
   'sj.create': { fn: sjCreate_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
+  'sj.delete': { fn: sjDelete_, roles: [ROLES.ADMIN], write: true },
   'sj.line.suggestBatch': { fn: sjLineSuggestBatch_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: false },
   'sj.line.receive': { fn: sjLineReceive_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.receiveAll': { fn: sjReceiveAll_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
@@ -58,6 +59,10 @@ var ROUTES = {
   'sj.line.cancel': { fn: sjLineCancel_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'sj.import': { fn: sjImport_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
   'pending.list': { fn: pendingList_, roles: null, write: false },
+
+  /* --- impor dari ERP Atena (Surat Jalan / DN) --- */
+  'atena.dnList': { fn: atenaDnList_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: false },
+  'atena.importDn': { fn: atenaImportDn_, roles: [ROLES.ADMIN, ROLES.GUDANG], write: true },
 
   /* --- stok --- */
   'stock.list': { fn: stockList_, roles: null, write: false },

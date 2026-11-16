@@ -63,7 +63,7 @@ status baris (urutan evaluasi):
 
 | Dokumen | Format | Counter key |
 | --- | --- | --- |
-| Surat Jalan | `SJ/{tahun}/{urut 4 digit}` | `SJ-{tahun}` |
+| Surat Jalan | `SJ/{tahun}/{urut 4 digit}` — **kecuali impor Atena**: nomor SJ = `no_dn` (mis. `DN.01.261110.147`) | `SJ-{tahun}` (hanya untuk SJ manual) |
 | Batch | `BN-{YYYYMMDD}-{urut 3 digit}` | `BATCH-{YYYYMMDD}` |
 | Pengiriman (DO) | `DNTTP-{YYMM}-{urut 3 digit, lanjut 4 bila >999}` — reset tiap bulan | `DO-{YYMM}` |
 

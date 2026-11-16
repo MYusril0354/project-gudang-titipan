@@ -90,6 +90,9 @@ Satu-satunya action yang juga menerima `GET`: `GET {GAS_EXEC_URL}?action=system.
 | `sj.line.wait` | ADMIN, GUDANG | ✓ | Fisik Belum Ada (alasan, ETA, PIC) |
 | `sj.line.cancel` | ADMIN, GUDANG | ✓ | Batalkan sisa |
 | `sj.import` | ADMIN, GUDANG | ✓ | Impor banyak Surat Jalan dari satu CSV (dikelompokkan per `no_sj`) |
+| `sj.delete` | ADMIN | ✓ | Hapus SJ yang **belum pernah menerima stok** (membatalkan salah impor) |
+| `atena.dnList` | ADMIN, GUDANG | – | Tarik DN ERP Atena (`/api/v2/dn`) untuk rentang tanggal |
+| `atena.importDn` | ADMIN, GUDANG | ✓ | Jadikan DN terpilih sebagai SJ (nomor SJ = no DN, baris OPEN) |
 | `pending.list` | semua | – | Antrean pending + bucket umur |
 | `stock.list` | semua | – | Stok per batch + ringkasan per pelanggan |
 | `stock.available` | ADMIN, GUDANG | – | Batch tersedia untuk satu pelanggan |
@@ -106,6 +109,75 @@ Satu-satunya action yang juga menerima `GET`: `GET {GAS_EXEC_URL}?action=system.
 ## 4. Paginasi
 
 Daftar besar mendukung `page`, `pageSize` (default 50), `q` (pencarian), dan filter spesifik per action (mis. `status`, `customerId`, `from`, `to`).
+
+### Impor dari ERP Atena
+
+Aplikasi menarik Delivery Note (DN) dari worker ERP Atena
+(`GET {ATENA_BASE_URL}/api/v2/dn?from=&to=&cbStatus=`, sumber laporan LSJ12)
+lewat **backend**, bukan dari browser. Alasannya: alamat & token Atena tidak
+pernah sampai ke pengguna, aksi dibatasi peran ADMIN/GUDANG, dan setiap impor
+tercatat di audit.
+
+Konfigurasi (Script Properties, opsional):
+
+| Property | Isi |
+| --- | --- |
+| `ATENA_BASE_URL` | base URL worker (default `https://atena-dr-worker.m-yusril-al-ubadillah.workers.dev`) |
+| `ATENA_TOKEN` | token baca `po_...` dari halaman `/admin` Atena (tanpa token: 20 permintaan/menit per IP) |
+
+#### `atena.dnList`
+
+```json
+{ "action": "atena.dnList", "params": { "from": "2026-11-10", "to": "2026-11-10", "cbStatus": "I,S,P" } }
+```
+
+- `from`/`to` wajib, format `YYYY-MM-DD`, rentang **maksimal 31 hari**.
+- `cbStatus` default `I,S,P` (tanpa dokumen batal `D`).
+- Balasan: `{ meta:{from,to,status,source,generatedAt,totalDn,totalItem},
+  items:[{ noDn,tglKirim,customer,customerId,jenis,ekspedisi,noDr,noPo,
+  jatuhTempo,keterangan,itemCount,totalQty,unknownProducts,imported,
+  items:[{kode,nama,satuan,qty,batch,ed,productId,productName}] }] }`
+- `customerId` = tebakan pelanggan kita (cocok kode/nama, atau satu-satunya yang
+  memuat nama Atena). Kosong = user wajib memilih sendiri.
+- `unknownProducts` = jumlah item yang kode barangnya belum ada di master.
+- `imported` = `true` bila `no_dn` sudah ada sebagai nomor SJ.
+
+Respons mentah Atena di-cache 120 detik di `CacheService` (hanya menahan klik
+ganda; datanya tetap realtime dari ERP).
+
+#### `atena.importDn`
+
+```json
+{ "action": "atena.importDn", "params": { "dns": [
+  { "noDn": "DN.01.261110.147", "tglKirim": "2026-11-10",
+    "customerId": "<id pelanggan>", "noDr": "DR...", "noPo": "PO...",
+    "jenis": "PENJUALAN",
+    "items": [ { "kode": "S0302", "qty": 150, "batch": "2610102E", "ed": "2029-10-22" } ] }
+] } }
+```
+
+- Satu DN = satu Surat Jalan dengan **nomor SJ = `no_dn`** (huruf besar).
+- Baris dibuat berstatus **OPEN** (`planned_batch`/`planned_ed` dari DN). Stok
+  **belum** bertambah — baru masuk saat "Fisik Ada" dikonfirmasi.
+- Semua DN divalidasi lebih dulu; DN yang gagal dilaporkan tanpa menggagalkan
+  DN lain. Batas 60 DN per impor.
+- Aturan penolakan: DN tanpa nomor, duplikat dalam satu kiriman, `no_dn` sudah
+  pernah diimpor (`DUPLICATE`), pelanggan belum dipilih, atau tidak ada satu pun
+  baris yang produknya ada di master (`VALIDATION_ERROR`).
+- Item dengan kode barang tak dikenal **dilewati** dan dilaporkan di
+  `skippedLines`.
+- Balasan: `{ created:[{no,lines,noDr,jenis}], failed:[{noDn,code,message}],
+  skippedLines:[{noDn,kode,message}], totals:{requested,created,lines,skipped,failed} }`.
+
+### `sj.delete`
+
+```json
+{ "action": "sj.delete", "params": { "no": "DN.01.261110.147" } }
+```
+
+ADMIN saja. Menghapus SJ beserta baris dan catatan pembatalannya — dipakai
+untuk membatalkan salah impor. **Ditolak** (`IN_USE`) bila SJ sudah punya
+penerimaan fisik (`receipts`) atau sudah tercatat di kartu stok (`movements`).
 
 ## 5. Kontrak Stok & Pengiriman (Fase 3)
 

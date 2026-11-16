@@ -364,6 +364,11 @@ function sjView_(sj, ds) {
     po: sj.po || '',
     status: sjStatusOfStatuses_(statuses),
     totalLines: lines.length,
+    /**
+     * Boleh dihapus hanya bila belum satu pun baris punya penerimaan fisik.
+     * Dipakai frontend untuk menampilkan tombol Hapus (ADMIN).
+     */
+    canDelete: lines.every(function (l) { return !(l.receipts || []).length; }),
     lines: lines
   };
 }
@@ -720,6 +725,57 @@ function sjCreate_(params, ctx) {
   var ds = sjDataset_();
   var created = ds.sjs.filter(function (s) { return String(s.no) === no; })[0];
   return sjView_(created, ds);
+}
+
+/**
+ * Hapus Surat Jalan yang BELUM pernah menerima stok (ADMIN).
+ *
+ * Dipakai untuk membatalkan salah impor (mis. impor dari Atena): SJ beserta
+ * baris dan catatan pembatalannya dihapus. DITOLAK bila sudah ada penerimaan
+ * fisik atau mutasi kartu stok, karena stok yang sudah masuk tidak boleh
+ * dihapus lewat jalur ini (pakai pengiriman/VOID atau rekonsiliasi).
+ */
+function sjDelete_(params, ctx) {
+  var no = String(assertRequired_(params.no || params.sjNo, 'no', 'No SJ')).trim().toUpperCase();
+
+  var sjs = readTableWhere_('sj', { no: no });
+  if (!sjs.length) throw apiError_('NOT_FOUND', 'Surat Jalan tidak ditemukan.', 'no');
+
+  var lines = readTableWhere_('sj_lines', { sj_no: no });
+  var lineIds = {};
+  lines.forEach(function (l) { lineIds[String(l.id)] = true; });
+
+  // Guard 1: sudah ada penerimaan fisik?
+  var receipts = readTable_('receipts');
+  for (var i = 0; i < receipts.length; i++) {
+    if (lineIds[String(receipts[i].sj_line_id)]) {
+      throw apiError_('IN_USE',
+        'SJ ini sudah punya penerimaan fisik — stok tidak boleh dihapus lewat jalur ini.');
+    }
+  }
+
+  // Guard 2: sudah tercatat di kartu stok (mutasi)?
+  var movements = readTable_('movements');
+  for (var m = 0; m < movements.length; m++) {
+    if (String(movements[m].sj_ref || '') === no || String(movements[m].ref || '') === no) {
+      throw apiError_('IN_USE',
+        'SJ ini sudah tercatat di kartu stok (mutasi ' + (movements[m].type || '-') + ').');
+    }
+  }
+
+  var removedLines = 0;
+  var removedCancels = 0;
+  lines.forEach(function (l) {
+    readTableWhere_('cancellations', { sj_line_id: l.id }).forEach(function (c) {
+      if (deleteById_('cancellations', c.id)) removedCancels++;
+    });
+    if (deleteById_('sj_lines', l.id)) removedLines++;
+  });
+  deleteById_('sj', no);
+
+  audit_(ctx, 'sj.delete', 'sj', no, { lines: removedLines, cancellations: removedCancels });
+
+  return { deleted: true, no: no, lines: removedLines, cancellations: removedCancels };
 }
 
 /**

@@ -238,6 +238,89 @@ function systemSelfTest_(params, ctx) {
     return true;
   });
 
+  /* ---------- IMPOR ATENA (pemetaan, tanpa jaringan) ---------- */
+  check('atena: cocok pelanggan lewat kode persis', true, function () {
+    var list = [
+      { id: 'c1', code: 'TANGERANG', name: 'ENSEVAL TANGERANG UP HERY SNA' },
+      { id: 'c2', code: 'BANDUNG', name: 'ENSEVAL BANDUNG UP LELY SNA' }
+    ];
+    var got = atenaGuessCustomer_('TANGERANG', list);
+    if (got !== 'c1') throw new Error('dapat ' + got);
+    return true;
+  });
+
+  check('atena: tidak menebak bila kandidat lebih dari satu', true, function () {
+    var list = [
+      { id: 'c1', code: 'TNG-1', name: 'ENSEVAL TANGERANG 1' },
+      { id: 'c2', code: 'TNG-2', name: 'ENSEVAL TANGERANG 2' }
+    ];
+    var got = atenaGuessCustomer_('TANGERANG', list);
+    if (got !== '') throw new Error('seharusnya kosong, dapat ' + got);
+    return true;
+  });
+
+  check('atena: DN dipetakan ke produk & pelanggan kita', true, function () {
+    if (!cust) throw new Error('pelanggan uji tidak ada');
+    var atenProd = track('product', masterCreate_({
+      entity: 'product',
+      values: { code: 'ZZ-ATENA-1', name: 'Uji Atena', unit: 'pcs' }
+    }, admin));
+    var res = atenaBuildDnResult_({
+      meta: { total_item: 2, generated_at: '2026-11-16T00:00:00Z' },
+      delivery_notes: [{
+        no_dn: 'dn.uji.1', tgl_kirim: '2026-11-16', customer: 'Uji Pelanggan', jenis: 'PENJUALAN',
+        no_dr: 'DR.UJI.1', no_po_pelanggan: 'PO-UJI', ekspedisi: 'EPM UJI',
+        items: [
+          { kode_barang: 'ZZ-ATENA-1', nama_barang: 'Uji Atena', satuan: 'pcs', jml: 10, nomer_batch: 'B1', tgl_expired: '2027-01-01' },
+          { kode_barang: 'ZZ-TIDAK-ADA', nama_barang: 'X', satuan: 'pcs', jml: 5 }
+        ]
+      }]
+    }, '2026-11-16', '2026-11-16', 'I,S,P');
+
+    var dn = res.items[0];
+    if (!dn) throw new Error('DN tidak terbentuk');
+    if (dn.noDn !== 'DN.UJI.1') throw new Error('noDn = ' + dn.noDn);
+    if (dn.customerId !== cust.id) throw new Error('pelanggan tidak terpetakan: ' + dn.customerId);
+    if (dn.unknownProducts !== 1) throw new Error('unknownProducts = ' + dn.unknownProducts);
+    if (dn.totalQty !== 15) throw new Error('totalQty = ' + dn.totalQty);
+    if (dn.imported !== false) throw new Error('imported harus false');
+    if (dn.items[0].productId !== atenProd.id) throw new Error('produk uji tidak terpetakan');
+    if (dn.items[1].productId !== '') throw new Error('produk asing harus kosong');
+    return true;
+  });
+
+  /* ---------- HAPUS SJ (membatalkan salah impor) ---------- */
+  if (cust && loc) {
+    check('sj: buat SJ uji untuk penghapusan', true, function () {
+      var delProd = track('product', masterCreate_({
+        entity: 'product',
+        values: { code: 'ZZ-DEL-1', name: 'Uji Hapus SJ', unit: 'pcs' }
+      }, admin));
+
+      var row = sjCreate_({
+        no: 'ZZ-HAPUS-1',
+        date: '2026-11-16',
+        customerId: cust.id,
+        po: 'PO-UJI-HAPUS',
+        lines: [{ productId: delProd.id, qty: 2 }]
+      }, admin);
+
+      if (String(row.no) !== 'ZZ-HAPUS-1') throw new Error('nomor SJ = ' + row.no);
+      return true;
+    });
+
+    check('sj: hapus SJ yang belum menerima stok', true, function () {
+      var res = sjDelete_({ no: 'ZZ-HAPUS-1' }, admin);
+      if (!res.deleted) throw new Error('tidak terhapus');
+      if (Number(res.lines) !== 1) throw new Error('baris terhapus = ' + res.lines);
+      return true;
+    });
+
+    check('sj: hapus SJ yang tidak ada ditolak', 'NOT_FOUND', function () {
+      return sjDelete_({ no: 'ZZ-HAPUS-1' }, admin);
+    });
+  }
+
   /* ---------- ENTITY TIDAK DIKENAL ---------- */
   check('entity tidak dikenal ditolak', 'VALIDATION_ERROR', function () {
     return masterList_({ entity: 'supplier' }, admin);

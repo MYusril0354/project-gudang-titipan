@@ -127,6 +127,15 @@ Status lengkap + checklist ada di respons `system.hardening` tanpa parameter.
 | `ADMIN_EMAIL` | Script Properties | untuk notifikasi (opsional, lihat §7) |
 | Token sesi | respons `auth.login` | berlaku 12 jam, disimpan di `sessionStorage` |
 | Password | sheet `users` | SHA-256 + salt; tidak pernah tersimpan polos |
+| `ATENA_TOKEN` | Script Properties | opsional; token baca `po_...` dari halaman `/admin` Atena |
+| `ATENA_BASE_URL` | Script Properties | opsional; default worker `atena-dr-worker` |
+
+**Token Atena (opsional).** Tanpa token, endpoint baca Atena masih melayani
+sampai 20 permintaan/menit per IP. Bila muncul error `RATE_LIMITED`, buat token
+baca di `/admin` Atena lalu simpan di Script Properties `ATENA_TOKEN` (tanpa
+perlu deploy ulang). Token hanya dipakai di server — tidak pernah dikirim ke
+browser. Bila token hilang/bocor: matikan di `/admin`, buat baru, ganti
+property-nya.
 
 **Rotasi `SETUP_KEY`:** hapus property `SETUP_KEY`, jalankan `system.setup`
 sekali (akan membuat kunci baru bila sistem belum terkonfigurasi), lalu simpan
@@ -146,6 +155,7 @@ kunci baru di tempat aman. Jangan pernah membagikan kunci ini.
 | Keseimbangan stok | Halaman **Rekonsiliasi** — `variance` harus `0` |
 | Backup | `system.backupStatus` |
 | Kesehatan API | `system.health` (publik, bisa dicek dari luar) |
+| Error UPSTREAM_ERROR / RATE_LIMITED saat impor Atena | worker Atena tidak merespons / limit | cek GET {ATENA_BASE_URL}/api/health, tunggu sesuai pesan, atau pasang ATENA_TOKEN |
 
 Hanya error **tak terduga** yang dicatat ke `error_log`; kesalahan wajar
 (validasi, sesi kedaluwarsa, stok kurang) sengaja tidak dicatat agar log tetap

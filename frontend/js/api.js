@@ -60,7 +60,9 @@ const WRITE_INVALIDATES = {
   master: ['master', 'system', 'audit'],
   sj: ['sj', 'pending', 'dashboard', 'stock', 'ledger', 'report', 'audit'],
   shipment: ['shipment', 'sj', 'stock', 'pending', 'dashboard', 'ledger', 'report', 'audit'],
-  user: ['user', 'audit']
+  user: ['user', 'audit'],
+  // Impor dari Atena membuat SJ baru (stok belum berubah sampai Fisik Ada).
+  atena: ['sj', 'pending', 'dashboard', 'audit']
 };
 
 /** Buang cache yang terdampak satu aksi tulis. */
@@ -220,6 +222,8 @@ export const sj = {
   get: (no) => api('sj.get', { no }),
   nextNumber: () => api('sj.nextNumber'),
   create: (payload) => api('sj.create', payload, { write: true }),
+  // Hapus SJ yang belum pernah menerima stok (ADMIN) — untuk salah impor.
+  remove: (no) => api('sj.delete', { no }, { write: true }),
   suggestBatch: (date) => api('sj.line.suggestBatch', { date }),
   receive: (payload) => api('sj.line.receive', payload, { write: true }),
   receiveAll: (payload) => api('sj.receiveAll', payload, { write: true }),
@@ -230,6 +234,12 @@ export const sj = {
 
 export const pending = {
   list: (filter) => api('pending.list', filter || {})
+};
+
+// Impor Surat Jalan dari ERP Atena (lewat backend, bukan langsung ke worker).
+export const atena = {
+  dnList: (params) => api('atena.dnList', params || {}),
+  importDn: (dns) => api('atena.importDn', { dns }, { write: true })
 };
 
 export const stock = {
