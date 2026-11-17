@@ -77,6 +77,7 @@ SJ sudah memotong stok di sistem existing, tetapi fisik barang belum tentu sudah
 │       ├── ui.js              # helper DOM (ikon SVG, modal, progress, tabel)
 │       ├── cache.js           # cache browser + stale-while-revalidate
 │       ├── print.js           # cetak surat jalan
+│       ├── print-label.js     # cetak sticker alamat per koli (6 per halaman)
 │       ├── print-stock.js     # cetak laporan posisi stok titipan
 │       ├── pages/*.js         # dashboard, penerimaan, pending, stok, pengiriman,
 │       │                      # kartu, laporan, master, pengguna, audit

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Preview — Cetak Sticker Alamat (Label Alamat)</title>
+<style>
+  /* =========================================================
+     CSS dari LabelAlamat.html (project lain), dirapikan.
+     Kertas: 214mm x 165mm landscape, grid 2 kolom x 3 baris (6 stiker/halaman).
+     Stiker: 100mm x 50mm.
+     ========================================================= */
+  @page {
+    size: 214mm 165mm landscape;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #525659;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 214mm;
+    height: 165mm;
+    background: white;
+    margin: 0 auto 20px auto;
+    padding: 1mm 7mm;
+    box-sizing: border-box;
+
+    display: grid;
+    grid-template-columns: 100mm 100mm;
+    grid-template-rows: 50mm 50mm 50mm;
+    column-gap: var(--col-gap, 0.6cm);
+    row-gap: 0.2cm;
+    justify-content: center;
+    align-content: center;
+
+    page-break-after: always;
+    position: relative;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  }
+
+  .sticker {
+    width: 100mm;
+    height: 50mm;
+    box-sizing: border-box;
+    padding: 5mm 8mm;
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #000;
+    border-radius: 5%;
+    /* garis bantu potong: hanya di layar, tidak tercetak */
+    outline: 1px dashed #cbd5e1;
+    outline-offset: -1px;
+  }
+
+  .title-row { margin-bottom: 5px; }
+  .title-row + .title-row { margin-top: -3px; }
+
+  .flex-row { display: flex; align-items: flex-start; }
+
+  .lbl { width: 65px; font-weight: bold; flex-shrink: 0; }
+  .separator { width: 15px; font-weight: bold; flex-shrink: 0; }
+  .val { flex-grow: 1; }
+
+  .tujuan-group { display: flex; flex-direction: column; }
+  .title-row .namapenerima { font-weight: bold; font-size: 15px; }
+  .title-row .telepon { font-size: 12px; }
+  /* Baris tengah boleh kosong: elemennya tidak dirender sama sekali. */
+  .tujuan-group .enseval { font-weight: bold; font-size: 14px; }
+  .tujuan-group .cabang { font-weight: bold; font-size: 30px; line-height: .9; margin-bottom: 3px; }
+  .tujuan-group .alamat { font-size: 11px; line-height: 1.2; }
+
+  .ekspedisi-row { margin-top: auto; padding-top: 5px; }
+
+  .do-tag { font-size: 10px; color: #555; margin-top: 2px; }
+
+  /* --- Panel kontrol (tidak tercetak) --- */
+  .panel {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 330px; overflow: auto;
+    background: #1f2430; color: #e5e7eb; padding: 16px 18px; box-sizing: border-box;
+    font-size: 13px; z-index: 1000;
+  }
+  .panel h1 { font-size: 15px; margin: 0 0 4px; }
+  .panel p.note { color: #9ca3af; font-size: 11.5px; line-height: 1.5; margin: 0 0 14px; }
+  .panel label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 12px; color: #cbd5e1; }
+  .panel input, .panel select, .panel textarea {
+    width: 100%; padding: 7px 9px; border-radius: 7px; border: 1px solid #3b4252;
+    background: #2b3240; color: #f3f4f6; font-family: inherit; font-size: 13px; box-sizing: border-box;
+  }
+  .panel .row { display: flex; gap: 10px; }
+  .panel .row > div { flex: 1; }
+  .panel button {
+    width: 100%; margin-top: 14px; padding: 10px; border: none; border-radius: 8px;
+    background: #0d6efd; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .panel button.sec { background: #374151; }
+  .panel .summary { margin-top: 14px; padding: 10px; background: #2b3240; border-radius: 8px; line-height: 1.6; }
+  .stage { margin-left: 330px; padding: 24px 0 60px; }
+  .stage-title { color: #e5e7eb; text-align: center; font-size: 13px; margin: 8px 0 18px; }
+
+  @media print {
+    body { background-color: transparent; width: 214mm; height: 165mm; margin: 0; padding: 0; }
+    .page { margin: 0 !important; box-shadow: none; page-break-after: always; }
+    .no-print { display: none !important; }
+    .sticker { outline: none; }
+    .stage { margin: 0; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== PANEL KONTROL (tidak tercetak) ===================== -->
+<div class="panel no-print">
+  <h1>Preview — Sticker Alamat</h1>
+  <p class="note">
+    Contoh data: DO ke pelanggan <b>TANGERANG</b>, ekspedisi <b>EPM SUB</b>, total <b>8 colly</b>
+    → <b>8 stiker</b>. Baris tengah sengaja <b>kosong</b>, jadi langsung kode cabang besar.
+  </p>
+
+  <label>Nama pelanggan</label>
+  <input id="f-nama" value="ENSEVAL TANGERANG UP HERI SNA">
+
+  <label>Kode cabang (baris besar)</label>
+  <input id="f-cabang" value="TANGERANG">
+
+  <label>Alamat cabang</label>
+  <textarea id="f-alamat" rows="2">JL PAJAJARAN KEL GANDASARI KEC JATIUWUNG KOTA TANGERANG</textarea>
+
+  <div class="row">
+    <div>
+      <label>Kepada (kosong = urai otomatis)</label>
+      <input id="f-kepada" placeholder="otomatis: HERI SNA">
+    </div>
+    <div>
+      <label>No. telepon</label>
+      <input id="f-telepon" value="082114816459">
+    </div>
+  </div>
+
+  <label>Penempatan telepon</label>
+  <select id="f-telp">
+    <option value="baris" selected>Baris sendiri di bawah "Kepada"</option>
+    <option value="sebaris">Sebaris dengan "Kepada" (Kepada / telepon)</option>
+    <option value="tanpa">Tanpa telepon</option>
+  </select>
+
+  <label>Ekspedisi</label>
+  <input id="f-ekspedisi" value="EPM SUB">
+
+  <div class="row">
+    <div>
+      <label>Jumlah colly</label>
+      <input id="f-colly" type="number" min="1" max="60" value="8">
+    </div>
+    <div>
+      <label>Salinan per colly</label>
+      <input id="f-copy" type="number" min="1" max="10" value="1">
+    </div>
+  </div>
+
+  <label>Gaya baris tengah</label>
+  <select id="f-gaya">
+    <option value="kosong-kode" selected>Kosong + kode cabang besar (pilihan Anda)</option>
+    <option value="nama-kode">Nama pelanggan penuh + kode cabang besar</option>
+    <option value="enseval-nama">"Enseval" + nama pelanggan besar</option>
+    <option value="enseval-kode">"Enseval" + kode cabang besar (HTML asli)</option>
+  </select>
+
+  <div class="row">
+    <div>
+      <label>Jarak antar kolom (mm)</label>
+      <input id="f-gap" type="number" min="0" max="10" step="0.5" value="6">
+    </div>
+    <div>
+      <label>Tampilkan No. DO</label>
+      <select id="f-do">
+        <option value="0" selected>Tidak</option>
+        <option value="1">Ya (kecil di bawah)</option>
+      </select>
+    </div>
+  </div>
+
+  <label>No. DO (contoh)</label>
+  <input id="f-nodo" value="DNTTP-2611-001">
+
+  <button onclick="window.print()">🖨️ Cetak Sticker Alamat</button>
+  <button class="sec" onclick="isiContoh()">Muat ulang contoh data</button>
+
+  <div class="summary" id="ringkasan"></div>
+</div>
+
+<!-- ===================== HASIL CETAK ===================== -->
+<div class="stage">
+  <div class="stage-title no-print" id="judul"></div>
+  <div id="halaman"></div>
+</div>
+
+<script>
+/* =========================================================
+   Render stiker — di aplikasi nanti logika ini ada di
+   frontend/js/print-label.js dan memakai data DO sungguhan.
+   ========================================================= */
+const ITEMS_PER_PAGE = 6;
+
+const contoh = {
+  nama: 'ENSEVAL TANGERANG UP HERI SNA',
+  cabang: 'TANGERANG',
+  alamat: 'JL PAJAJARAN KEL GANDASARI KEC JATIUWUNG KOTA TANGERANG',
+  kepada: '',
+  telepon: '082114816459',
+  telpMode: 'baris',
+  ekspedisi: 'EPM SUB',
+  colly: 8,
+  salinan: 1,
+  gaya: 'kosong-kode',
+  gap: 6,
+  tampilDo: false,
+  noDo: 'DNTTP-2611-001'
+};
+
+const $ = (id) => document.getElementById(id);
+
+/** Helper elemen: teks selalu lewat textContent (anti-XSS). */
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+/** Urai "UP <nama>" dari nama pelanggan (untuk kolom Kepada). */
+function uraiPenerima(nama) {
+  const m = String(nama || '').match(/\bUP\s+(.+)$/i);
+  return m ? m[1].trim() : '';
+}
+
+/** Baris tengah stiker sesuai gaya yang dipilih. */
+function barisTujuan(d) {
+  if (d.gaya === 'enseval-nama') return { atas: 'Enseval', besar: d.nama };
+  if (d.gaya === 'enseval-kode') return { atas: 'Enseval', besar: d.cabang };
+  if (d.gaya === 'nama-kode') return { atas: d.nama, besar: d.cabang };
+  return { atas: '', besar: d.cabang }; // kosong-kode: baris tengah tidak dirender
+}
+
+/** Baris label + titik dua + nilai (dipakai semua baris stiker). */
+function baris(label, isi) {
+  const row = el('div', 'flex-row');
+  row.appendChild(el('div', 'lbl', label));
+  row.appendChild(el('div', 'separator', ':'));
+  if (typeof isi === 'string') row.appendChild(el('div', 'val', isi));
+  else row.appendChild(isi);
+  return row;
+}
+
+/** Satu kotak stiker. */
+function buatStiker(d) {
+  const wrap = el('div', 'sticker');
+
+  const kepada = (d.kepada || '').trim() || uraiPenerima(d.nama) || d.nama;
+  const telepon = (d.telepon || '').trim();
+
+  // --- Kepada (+ telepon) ---
+  const titleRow = el('div', 'flex-row title-row');
+  titleRow.appendChild(el('div', 'lbl', 'Kepada'));
+  titleRow.appendChild(el('div', 'separator', ':'));
+  if (d.telpMode === 'sebaris' && telepon) {
+    const val = el('div', 'val');
+    val.appendChild(el('span', 'namapenerima', kepada));
+    val.appendChild(el('span', 'telepon', ' / ' + telepon));
+    titleRow.appendChild(val);
+  } else {
+    titleRow.appendChild(el('span', 'namapenerima', kepada));
+  }
+  wrap.appendChild(titleRow);
+
+  if (d.telpMode === 'baris' && telepon) {
+    const telpRow = el('div', 'flex-row title-row');
+    telpRow.appendChild(el('div', 'lbl', 'Telepon'));
+    telpRow.appendChild(el('div', 'separator', ':'));
+    telpRow.appendChild(el('span', 'namapenerima', telepon));
+    wrap.appendChild(telpRow);
+  }
+
+  // --- Tujuan ---
+  const group = el('div', 'val tujuan-group');
+  const t = barisTujuan(d);
+  if (t.atas) group.appendChild(el('span', 'enseval', t.atas)); // kosong -> tidak dirender
+  group.appendChild(el('span', 'cabang', t.besar));
+  group.appendChild(el('span', 'alamat', d.alamat));
+
+  const tujuanRow = baris('Tujuan', group);
+  tujuanRow.style.flexGrow = '1';
+  wrap.appendChild(tujuanRow);
+
+  // --- Ekspedisi ---
+  const eksVal = el('div', 'val', d.ekspedisi);
+  eksVal.style.fontWeight = 'bold';
+  const eksRow = baris('Ekspedisi', eksVal);
+  eksRow.classList.add('ekspedisi-row');
+  wrap.appendChild(eksRow);
+
+  if (d.tampilDo && d.noDo) wrap.appendChild(el('div', 'do-tag', 'DO: ' + d.noDo));
+
+  return wrap;
+}
+
+/** Bangun semua halaman: 6 stiker per halaman, slot sisa dibiarkan kosong. */
+function render(d) {
+  const total = Math.max(1, Number(d.colly) || 0) * Math.max(1, Number(d.salinan) || 1);
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const host = $('halaman');
+  host.innerHTML = '';
+  host.style.setProperty('--col-gap', (Number(d.gap) || 0) + 'mm');
+
+  let dibuat = 0;
+  for (let p = 0; p < totalPages; p++) {
+    const page = el('div', 'page');
+    for (let i = 0; i < ITEMS_PER_PAGE; i++) {
+      if (dibuat < total) { page.appendChild(buatStiker(d)); dibuat++; }
+      else page.appendChild(el('div', 'sticker')); // slot kosong agar grid rapi
+    }
+    host.appendChild(page);
+  }
+
+  const info = [
+    ['Stiker dicetak', total + ' lembar'],
+    ['Halaman', totalPages + ' halaman (6 stiker/halaman)'],
+    ['Ukuran kertas', '214 × 165 mm (landscape)'],
+    ['Ukuran stiker', '100 × 50 mm'],
+    ['Kepada', ((d.kepada || '').trim() || uraiPenerima(d.nama) || d.nama)],
+    ['Telepon', (d.telpMode === 'tanpa' || !d.telepon) ? '(tidak dicetak)' : d.telepon]
+  ];
+  $('ringkasan').innerHTML = '';
+  info.forEach(([k, v]) => {
+    const row = document.createElement('div');
+    row.appendChild(el('b', null, k + ': '));
+    row.appendChild(document.createTextNode(v));
+    $('ringkasan').appendChild(row);
+  });
+  $('judul').textContent = total + ' stiker · ' + totalPages + ' halaman';
+}
+
+/** Baca panel kontrol -> data. */
+function dariPanel() {
+  return {
+    nama: $('f-nama').value,
+    cabang: $('f-cabang').value,
+    alamat: $('f-alamat').value,
+    kepada: $('f-kepada').value,
+    telepon: $('f-telepon').value,
+    telpMode: $('f-telp').value,
+    ekspedisi: $('f-ekspedisi').value,
+    colly: Number($('f-colly').value) || 1,
+    salinan: Number($('f-copy').value) || 1,
+    gaya: $('f-gaya').value,
+    gap: Number($('f-gap').value) || 0,
+    tampilDo: $('f-do').value === '1',
+    noDo: $('f-nodo').value
+  };
+}
+
+function isiContoh() {
+  $('f-nama').value = contoh.nama;
+  $('f-cabang').value = contoh.cabang;
+  $('f-alamat').value = contoh.alamat;
+  $('f-kepada').value = contoh.kepada;
+  $('f-telepon').value = contoh.telepon;
+  $('f-telp').value = contoh.telpMode;
+  $('f-ekspedisi').value = contoh.ekspedisi;
+  $('f-colly').value = contoh.colly;
+  $('f-copy').value = contoh.salinan;
+  $('f-gaya').value = contoh.gaya;
+  $('f-gap').value = contoh.gap;
+  $('f-do').value = contoh.tampilDo ? '1' : '0';
+  $('f-nodo').value = contoh.noDo;
+  render(dariPanel());
+}
+
+['f-nama','f-cabang','f-alamat','f-kepada','f-telepon','f-telp','f-ekspedisi','f-colly','f-copy','f-gaya','f-gap','f-do','f-nodo']
+  .forEach((id) => $(id).addEventListener('input', () => render(dariPanel())));
+$('f-telp').addEventListener('change', () => render(dariPanel()));
+$('f-gaya').addEventListener('change', () => render(dariPanel()));
+$('f-do').addEventListener('change', () => render(dariPanel()));
+
+isiContoh();
+</script>
+</body>
+</html>

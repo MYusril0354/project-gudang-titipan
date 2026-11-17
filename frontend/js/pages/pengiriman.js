@@ -15,6 +15,7 @@ import {
 } from '../ui.js';
 import { openCreateShipment, openPod, openVoid } from '../modals/shipment.js';
 import { printSuratJalan } from '../print.js';
+import { openLabelPrint } from '../modals/label.js';
 
 const STATUS_FILTERS = [
   { value: '', label: 'Semua status' },
@@ -203,6 +204,14 @@ function buildActions(item, opts) {
           if (opts.reload) await opts.reload();
         }
       }
+    }));
+  }
+
+  if (item.status !== 'VOID') {
+    group.appendChild(btn('Cetak Label', {
+      sm: true,
+      title: 'Cetak sticker alamat per koli (1 stiker per colly)',
+      onClick: () => openLabelPrint(item)
     }));
   }
 
